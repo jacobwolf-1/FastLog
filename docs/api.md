@@ -2,24 +2,40 @@
 
 FastLog is API-first. The iOS app, ChatGPT Actions, Claude tools, Apple Shortcuts, and future clients should use the same authenticated backend operations.
 
-All endpoints are under `/v1`. All requests require a user-scoped bearer token unless explicitly implemented as trusted service-role backend operations. Do not add public unauthenticated write paths.
+This document describes the full backend API. The restricted ChatGPT Action subset is in `openapi/chatgpt-action.yaml`.
+
+## Auth And Runtime
+
+All routes are under `/v1` and require `Authorization: Bearer <token>`.
+
+Runtime modes:
+
+- `FASTLOG_STORE=supabase`: uses `SUPABASE_URL` and `SUPABASE_ANON_KEY`; the caller's user JWT is passed through to Supabase so RLS enforces ownership.
+- `FASTLOG_STORE=memory`: local development/test mode; tokens use `Bearer dev:<user-id>[:email]`.
+
+Do not expose `SUPABASE_SERVICE_ROLE_KEY` to public clients. The service-role key is not required by the implemented REST layer.
 
 ## Conventions
 
 - Dates use `YYYY-MM-DD`.
 - Timestamps use ISO 8601.
 - Meal type is optional and defaults to `unspecified`.
-- Nutrition values must be non-negative.
-- `source` identifies the client path: `manual`, `shortcut`, `chatgpt`, `claude`, or `import`.
-- Health and nutrition data is sensitive. Responses should expose only the authenticated user's records.
+- Nutrition values must be non-negative; calories must be positive.
+- `source` identifies the trusted server/integration path: `manual`, `shortcut`, `chatgpt`, `claude`, or `import`.
+- Public clients must not be trusted to declare `source` or `provider` in request bodies.
+- The REST layer ignores/overrides untrusted `source` and `provider` fields based on server-side integration context.
+- AI-origin writes are audited when the server-side integration context is `chatgpt` or `claude`.
 
-## Food Logs
+## Full Backend API
 
-### `POST /v1/food-logs`
+### Food Logs
 
-Creates a one-off food log.
+```http
+POST /v1/food-logs
+GET /v1/food-logs?date=YYYY-MM-DD
+```
 
-Request:
+`POST /v1/food-logs` creates a one-off food log.
 
 ```json
 {
@@ -32,85 +48,27 @@ Request:
   "fat_g": 12,
   "fiber_g": 6,
   "sodium_mg": 850,
-  "source": "manual",
   "raw_input": "Log chicken and potatoes for lunch"
 }
 ```
 
-Response: `201 Created` with the created food log.
+### Dashboard
 
-### `GET /v1/food-logs?date=YYYY-MM-DD`
-
-Returns food logs for the authenticated user on the requested local date. API implementation should decide and document the user's timezone handling before production.
-
-### `PATCH /v1/food-logs/{id}`
-
-Updates one food log owned by the authenticated user.
-
-### `DELETE /v1/food-logs/{id}`
-
-Deletes one food log owned by the authenticated user. AI clients should ask confirmation before deletion.
-
-## Dashboard
-
-### `GET /v1/dashboard/today`
-
-Returns today's totals and current targets.
-
-### `GET /v1/dashboard?date=YYYY-MM-DD`
-
-Returns totals for a specific date.
-
-Response shape:
-
-```json
-{
-  "date": "2026-06-02",
-  "targets": {
-    "calories": 2300,
-    "protein_g": 180,
-    "carbs_g": 220,
-    "fat_g": 70,
-    "fiber_g": 35,
-    "sodium_mg": 2300,
-    "sugar_g": 75,
-    "potassium_mg": 4700
-  },
-  "totals": {
-    "calories": 1520,
-    "protein_g": 125,
-    "carbs_g": 145,
-    "fat_g": 48,
-    "fiber_g": 24,
-    "sodium_mg": 1700,
-    "sugar_g": 32,
-    "potassium_mg": 2100
-  },
-  "remaining": {
-    "calories": 780,
-    "protein_g": 55,
-    "carbs_g": 75,
-    "fat_g": 22,
-    "fiber_g": 11,
-    "sodium_mg": 600,
-    "sugar_g": 43,
-    "potassium_mg": 2600
-  },
-  "logs": []
-}
+```http
+GET /v1/dashboard/today
+GET /v1/dashboard?date=YYYY-MM-DD
 ```
 
-## Targets
+Returns targets, totals, remaining values, and logs for the requested date.
 
-### `GET /v1/targets/current`
+### Targets
 
-Returns the latest target row whose `effective_date` is on or before today.
+```http
+GET /v1/targets/current
+PATCH /v1/targets
+```
 
-### `PATCH /v1/targets`
-
-Creates a new effective target row or updates today's target, depending on final API implementation. Prefer preserving target history by creating a new row when values change.
-
-Request:
+`PATCH /v1/targets` upserts targets by `effective_date`.
 
 ```json
 {
@@ -126,17 +84,32 @@ Request:
 }
 ```
 
-## Saved Meals
+### Saved Meals
 
-### `GET /v1/saved-meals`
+```http
+GET /v1/saved-meals
+GET /v1/saved-meals/resolve?query=GB%20%2B%20Potato
+POST /v1/saved-meals
+POST /v1/saved-meals/{id}/log
+DELETE /v1/saved-meals/{id}
+```
 
-Lists saved meals and aliases for the authenticated user.
+`POST /v1/saved-meals` creates a saved meal and aliases.
 
-### `GET /v1/saved-meals/resolve?query=GB%20%2B%20Potato`
+```json
+{
+  "name": "GB + Potato",
+  "aliases": ["ground beef potato", "beef potato", "gb potato"],
+  "calories": 610,
+  "protein_g": 50,
+  "carbs_g": 56,
+  "fat_g": 18,
+  "fiber_g": 5,
+  "sodium_mg": 850
+}
+```
 
-Resolves a saved meal name or alias.
-
-Match priority:
+Resolution priority:
 
 1. Exact name match.
 2. Exact alias match.
@@ -144,7 +117,7 @@ Match priority:
 4. Normalized alias match.
 5. Fuzzy match only if high confidence.
 
-Not found response:
+If no confident match exists:
 
 ```json
 {
@@ -153,62 +126,50 @@ Not found response:
 }
 ```
 
-### `POST /v1/saved-meals`
+`POST /v1/saved-meals/{id}/log` copies stored macros into a historical food log and applies `serving_multiplier`.
 
-Creates a saved meal template and optional aliases.
+Deleting a saved meal cascades its aliases, but does not delete historical food logs. Historical logs keep copied macro values and set `saved_meal_id` to null.
 
-### `PATCH /v1/saved-meals/{id}`
+### Weight
 
-Updates a saved meal template. Alias updates can be implemented either in this endpoint or with dedicated alias endpoints later.
-
-### `DELETE /v1/saved-meals/{id}`
-
-Deletes a saved meal template. AI clients should ask confirmation before deletion.
-
-### `POST /v1/saved-meals/{id}/log`
-
-Logs a saved meal with optional serving multiplier and meal type override.
-
-Request:
-
-```json
-{
-  "logged_at": "2026-06-02T12:00:00Z",
-  "meal_type": "dinner",
-  "serving_multiplier": 1.5,
-  "source": "chatgpt",
-  "raw_input": "Log 1.5x GB + Potato for dinner"
-}
+```http
+POST /v1/weight-entries
+GET /v1/weight-trend?range=week
+GET /v1/weight-trend?range=month
+GET /v1/weight-trend?range=year
 ```
 
-The created `food_logs` row stores copied macro values multiplied by `serving_multiplier` and references `saved_meal_id`.
+Weight is stored in the backend as app data. ChatGPT/Claude must not write directly to Apple Health.
 
-## Weight
+## ChatGPT Action Subset
 
-### `POST /v1/weight-entries`
+The first Action schema intentionally includes only:
 
-Creates a manual, Apple Health, or imported weight record.
+- `logFood`
+- `getTodayDashboard`
+- `updateTargets`
+- `listSavedMeals`
+- `resolveSavedMeal`
+- `logSavedMeal`
+- `createSavedMeal`
 
-Request:
+Excluded from the first Action subset:
 
-```json
-{
-  "measured_at": "2026-06-02T12:00:00Z",
-  "weight_lb": 178.4,
-  "source": "manual"
-}
-```
+- Weight entry writes.
+- Weight trend reads.
+- Deletes.
+- Broad edits.
+- Any direct Apple Health writes.
 
-### `GET /v1/weight-trend?range=week`
+## AI Audit Behavior
 
-Supported ranges:
+The API writes `ai_audit_log` rows for AI-origin operations when the server is running with a trusted integration context such as `FASTLOG_INTEGRATION_PROVIDER=chatgpt`.
 
-- `week`
-- `month`
-- `year`
+Audited operations:
 
-Returns points, average weight, and period change.
+- `logFood`.
+- `logSavedMeal`.
+- `createSavedMeal`.
+- `updateTargets`.
 
-## AI Audit
-
-API routes used by AI clients should insert an `ai_audit_log` row containing provider, action, raw user text when available, request payload, response payload, and any created resource reference.
+For a ChatGPT Action deployment, the server sets `provider = chatgpt` and `source = chatgpt`. If a request body attempts to claim `manual`, `claude`, `shortcut`, `import`, or `other`, the server ignores that claim. Claude support should use a separate Claude tool contract or server-side integration context, not a ChatGPT Action request field.

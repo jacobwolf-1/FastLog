@@ -106,7 +106,7 @@ create table public.food_logs (
   sodium_mg numeric check (sodium_mg is null or sodium_mg >= 0),
   sugar_g numeric check (sugar_g is null or sugar_g >= 0),
   potassium_mg numeric check (potassium_mg is null or potassium_mg >= 0),
-  saved_meal_id uuid references public.saved_meals(id) on delete set null,
+  saved_meal_id uuid,
   serving_multiplier numeric not null default 1 check (serving_multiplier > 0),
   source text not null default 'manual'
     check (source in ('manual', 'shortcut', 'chatgpt', 'claude', 'import')),
@@ -159,7 +159,8 @@ create index food_logs_user_logged_at_idx
 alter table public.food_logs
   add constraint food_logs_saved_meal_user_fk
   foreign key (saved_meal_id, user_id)
-  references public.saved_meals(id, user_id);
+  references public.saved_meals(id, user_id)
+  on delete set null (saved_meal_id);
 
 create index food_logs_user_saved_meal_idx
   on public.food_logs (user_id, saved_meal_id)

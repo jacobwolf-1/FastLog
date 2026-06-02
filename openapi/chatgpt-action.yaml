@@ -3,8 +3,9 @@ info:
   title: FastLog API
   version: 0.1.0
   description: >
-    Authenticated API for FastLog macro logging, dashboard reads, targets,
-    saved meal templates, saved meal resolution, and ChatGPT Action support.
+    Restricted ChatGPT Action subset for FastLog macro logging, dashboard reads,
+    targets, saved meal templates, saved meal resolution, and saved meal logging.
+    The full backend API also includes non-Action operations documented in docs/api.md.
 servers:
   - url: https://api.example.com
     description: Replace with FASTLOG_API_BASE_URL before publishing the action.
@@ -280,8 +281,6 @@ components:
               type:
                 - string
                 - 'null'
-            source:
-              $ref: '#/components/schemas/Source'
             raw_input:
               type:
                 - string
@@ -574,8 +573,6 @@ components:
           type: number
           minimum: 0.01
           default: 1
-        source:
-          $ref: '#/components/schemas/Source'
         raw_input:
           type:
             - string

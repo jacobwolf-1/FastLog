@@ -1,0 +1,12 @@
+{
+  "name": "fastlog-backend",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "FASTLOG_STORE=memory node --experimental-strip-types src/server.ts",
+    "start": "node --experimental-strip-types src/server.ts",
+    "test": "node --experimental-strip-types tests/integration.ts",
+    "verify:migration": "node --experimental-strip-types scripts/verify-migration.ts"
+  }
+}
