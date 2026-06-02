@@ -1,0 +1,582 @@
+openapi: 3.1.0
+info:
+  title: FastLog API
+  version: 0.1.0
+  description: >
+    Authenticated API for FastLog macro logging, dashboard reads, targets,
+    saved meal templates, saved meal resolution, and ChatGPT Action support.
+servers:
+  - url: https://api.example.com
+    description: Replace with FASTLOG_API_BASE_URL before publishing the action.
+security:
+  - bearerAuth: []
+paths:
+  /v1/food-logs:
+    post:
+      operationId: logFood
+      summary: Log a one-off food macro entry.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFoodLogRequest'
+      responses:
+        '201':
+          description: Food log created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodLog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/dashboard/today:
+    get:
+      operationId: getTodayDashboard
+      summary: Get today's nutrition dashboard.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Today's dashboard.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/targets:
+    patch:
+      operationId: updateTargets
+      summary: Update the user's daily nutrition targets.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTargetsRequest'
+      responses:
+        '200':
+          description: Updated targets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyTargets'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/saved-meals:
+    get:
+      operationId: listSavedMeals
+      summary: List saved meal templates.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Saved meals.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved_meals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SavedMeal'
+                required:
+                  - saved_meals
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createSavedMeal
+      summary: Create a saved meal template.
+      description: Do not use this for estimated meals unless the user explicitly asks to save the estimate.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSavedMealRequest'
+      responses:
+        '201':
+          description: Saved meal created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMeal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/saved-meals/resolve:
+    get:
+      operationId: resolveSavedMeal
+      summary: Resolve a saved meal by name or alias.
+      description: >
+        Resolve exact name, exact alias, normalized name, normalized alias, or a
+        high-confidence fuzzy match. If no confident match exists, return
+        match_status=not_found and do not invent macros.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: User-provided saved meal name or alias.
+      responses:
+        '200':
+          description: Resolution result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMealResolution'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/saved-meals/{id}/log:
+    post:
+      operationId: logSavedMeal
+      summary: Log a saved meal template.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogSavedMealRequest'
+      responses:
+        '201':
+          description: Food log created from saved meal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodLog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Saved meal not found.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    MealType:
+      type: string
+      enum:
+        - breakfast
+        - lunch
+        - dinner
+        - snack
+        - unspecified
+      default: unspecified
+    Source:
+      type: string
+      enum:
+        - manual
+        - shortcut
+        - chatgpt
+        - claude
+        - import
+      default: manual
+    NutritionInput:
+      type: object
+      properties:
+        calories:
+          type: integer
+          minimum: 1
+        protein_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        carbs_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        fat_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        fiber_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        sodium_mg:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        sugar_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        potassium_mg:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+      required:
+        - calories
+    CreateFoodLogRequest:
+      allOf:
+        - $ref: '#/components/schemas/NutritionInput'
+        - type: object
+          properties:
+            logged_at:
+              type:
+                - string
+                - 'null'
+              format: date-time
+            meal_type:
+              $ref: '#/components/schemas/MealType'
+            label:
+              type:
+                - string
+                - 'null'
+            source:
+              $ref: '#/components/schemas/Source'
+            raw_input:
+              type:
+                - string
+                - 'null'
+    FoodLog:
+      allOf:
+        - $ref: '#/components/schemas/NutritionInput'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            logged_at:
+              type: string
+              format: date-time
+            meal_type:
+              $ref: '#/components/schemas/MealType'
+            label:
+              type:
+                - string
+                - 'null'
+            saved_meal_id:
+              type:
+                - string
+                - 'null'
+              format: uuid
+            serving_multiplier:
+              type: number
+              minimum: 0
+            source:
+              $ref: '#/components/schemas/Source'
+            raw_input:
+              type:
+                - string
+                - 'null'
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+          required:
+            - id
+            - logged_at
+            - meal_type
+            - serving_multiplier
+            - source
+            - created_at
+            - updated_at
+    DailyTargets:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        calories:
+          type: integer
+          minimum: 1
+        protein_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        carbs_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        fat_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        fiber_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        sodium_mg:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        sugar_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        potassium_mg:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        effective_date:
+          type: string
+          format: date
+      required:
+        - id
+        - calories
+        - effective_date
+    UpdateTargetsRequest:
+      type: object
+      properties:
+        calories:
+          type: integer
+          minimum: 1
+        protein_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        carbs_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        fat_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        fiber_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        sodium_mg:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        sugar_g:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        potassium_mg:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        effective_date:
+          type:
+            - string
+            - 'null'
+          format: date
+      required:
+        - calories
+    Dashboard:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        targets:
+          $ref: '#/components/schemas/DailyTargets'
+        totals:
+          $ref: '#/components/schemas/NutritionTotals'
+        remaining:
+          $ref: '#/components/schemas/NutritionTotals'
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/FoodLog'
+      required:
+        - date
+        - totals
+        - remaining
+        - logs
+    NutritionTotals:
+      type: object
+      properties:
+        calories:
+          type: integer
+        protein_g:
+          type: number
+        carbs_g:
+          type: number
+        fat_g:
+          type: number
+        fiber_g:
+          type: number
+        sodium_mg:
+          type: number
+        sugar_g:
+          type: number
+        potassium_mg:
+          type: number
+      required:
+        - calories
+        - protein_g
+        - carbs_g
+        - fat_g
+        - fiber_g
+        - sodium_mg
+        - sugar_g
+        - potassium_mg
+    SavedMeal:
+      allOf:
+        - $ref: '#/components/schemas/NutritionInput'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            default_meal_type:
+              $ref: '#/components/schemas/MealType'
+            aliases:
+              type: array
+              items:
+                type: string
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+          required:
+            - id
+            - name
+            - default_meal_type
+            - aliases
+    CreateSavedMealRequest:
+      allOf:
+        - $ref: '#/components/schemas/NutritionInput'
+        - type: object
+          properties:
+            name:
+              type: string
+              minLength: 1
+            aliases:
+              type: array
+              items:
+                type: string
+            default_meal_type:
+              $ref: '#/components/schemas/MealType'
+          required:
+            - name
+    SavedMealResolution:
+      oneOf:
+        - type: object
+          properties:
+            match_status:
+              type: string
+              const: found
+            match_type:
+              type: string
+              enum:
+                - exact_name
+                - exact_alias
+                - normalized_name
+                - normalized_alias
+                - fuzzy_name
+                - fuzzy_alias
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+            saved_meal:
+              $ref: '#/components/schemas/SavedMeal'
+          required:
+            - match_status
+            - match_type
+            - confidence
+            - saved_meal
+        - type: object
+          properties:
+            match_status:
+              type: string
+              const: not_found
+            message:
+              type: string
+              const: No saved meal template found.
+          required:
+            - match_status
+            - message
+    LogSavedMealRequest:
+      type: object
+      properties:
+        logged_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        meal_type:
+          $ref: '#/components/schemas/MealType'
+        serving_multiplier:
+          type: number
+          minimum: 0.01
+          default: 1
+        source:
+          $ref: '#/components/schemas/Source'
+        raw_input:
+          type:
+            - string
+            - 'null'
