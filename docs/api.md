@@ -33,6 +33,8 @@ Do not expose `SUPABASE_SERVICE_ROLE_KEY` to public clients. The service-role ke
 ```http
 POST /v1/food-logs
 GET /v1/food-logs?date=YYYY-MM-DD
+PATCH /v1/food-logs/{id}
+DELETE /v1/food-logs/{id}
 ```
 
 `POST /v1/food-logs` creates a one-off food log.
@@ -51,6 +53,10 @@ GET /v1/food-logs?date=YYYY-MM-DD
   "raw_input": "Log chicken and potatoes for lunch"
 }
 ```
+
+`PATCH /v1/food-logs/{id}` updates one authenticated user-owned food log. Patchable fields are `label`, `meal_type`, `logged_at`, calories, macros, micros, and `raw_input`. Client-provided `source` and `provider` are ignored; source remains server-derived/existing metadata.
+
+`DELETE /v1/food-logs/{id}` deletes one authenticated user-owned food log.
 
 ### Dashboard
 
@@ -90,6 +96,7 @@ PATCH /v1/targets
 GET /v1/saved-meals
 GET /v1/saved-meals/resolve?query=GB%20%2B%20Potato
 POST /v1/saved-meals
+PATCH /v1/saved-meals/{id}
 POST /v1/saved-meals/{id}/log
 DELETE /v1/saved-meals/{id}
 ```
@@ -125,6 +132,12 @@ If no confident match exists:
   "message": "No saved meal template found."
 }
 ```
+
+`PATCH /v1/saved-meals/{id}` updates one authenticated user-owned saved meal template. Patchable fields are `name`, `default_meal_type`, calories, macros, micros, and `aliases`.
+
+Alias replacement is explicit: when `aliases` is present, the provided list replaces the existing alias set. Uniqueness is enforced by normalized alias uniqueness. In the current Supabase REST implementation this replacement is a delete-then-insert sequence rather than a single database transaction/RPC. If the insert step fails after deletion, aliases may need to be retried. For production, prefer moving alias replacement into a Postgres RPC transaction.
+
+Editing a saved meal template does not mutate historical food logs. Historical logs keep the copied macro values they had when logged.
 
 `POST /v1/saved-meals/{id}/log` copies stored macros into a historical food log and applies `serving_multiplier`.
 

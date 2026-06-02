@@ -72,7 +72,14 @@ Install the Supabase CLI if you want local database verification:
 npm install -g supabase
 ```
 
-Apply migrations in a Supabase project:
+For a true local reset/apply from scratch, run:
+
+```sh
+supabase start
+supabase db reset
+```
+
+Apply migrations to a linked remote Supabase project with:
 
 ```sh
 supabase db push

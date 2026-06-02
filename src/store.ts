@@ -26,6 +26,21 @@ export type CreateFoodLogInput = {
   raw_input?: string | null;
 };
 
+export type UpdateFoodLogInput = {
+  logged_at?: string | null;
+  meal_type?: string | null;
+  label?: string | null;
+  calories?: number;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+  fiber_g?: number | null;
+  sodium_mg?: number | null;
+  sugar_g?: number | null;
+  potassium_mg?: number | null;
+  raw_input?: string | null;
+};
+
 export type UpdateTargetsInput = {
   calories: number;
   protein_g?: number | null;
@@ -43,6 +58,20 @@ export type CreateSavedMealInput = {
   aliases?: string[];
   default_meal_type?: string | null;
   calories: number;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+  fiber_g?: number | null;
+  sodium_mg?: number | null;
+  sugar_g?: number | null;
+  potassium_mg?: number | null;
+};
+
+export type UpdateSavedMealInput = {
+  name?: string;
+  aliases?: string[];
+  default_meal_type?: string | null;
+  calories?: number;
   protein_g?: number | null;
   carbs_g?: number | null;
   fat_g?: number | null;
@@ -84,12 +113,15 @@ export type Dashboard = {
 export interface FastLogStore {
   ensureProfile(user: User): Promise<void>;
   createFoodLog(user: User, input: CreateFoodLogInput): Promise<FoodLog>;
+  updateFoodLog(user: User, foodLogId: string, input: UpdateFoodLogInput): Promise<FoodLog>;
+  deleteFoodLog(user: User, foodLogId: string): Promise<void>;
   listFoodLogs(user: User, date: string): Promise<FoodLog[]>;
   getDashboard(user: User, date: string): Promise<Dashboard>;
   getCurrentTargets(user: User, date: string): Promise<DailyTargets | null>;
   updateTargets(user: User, input: UpdateTargetsInput): Promise<DailyTargets>;
   listSavedMeals(user: User): Promise<SavedMeal[]>;
   createSavedMeal(user: User, input: CreateSavedMealInput): Promise<SavedMeal>;
+  updateSavedMeal(user: User, savedMealId: string, input: UpdateSavedMealInput): Promise<SavedMeal>;
   resolveSavedMeal(user: User, query: string): Promise<SavedMealResolution>;
   logSavedMeal(user: User, savedMealId: string, input: LogSavedMealInput): Promise<FoodLog>;
   deleteSavedMeal(user: User, savedMealId: string): Promise<void>;

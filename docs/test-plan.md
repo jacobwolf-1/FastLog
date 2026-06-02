@@ -1,6 +1,6 @@
 # Test Plan
 
-This first pass defines the backend contract and database foundation. The next pass should add executable integration tests around these cases.
+This backend now includes executable integration tests in `tests/integration.ts`. Run them with `npm test`. Migration/static FK verification is in `scripts/verify-migration.ts` and runs with `npm run verify:migration`.
 
 ## Target Creation
 
@@ -84,3 +84,26 @@ Verify:
 - Service-role backend operations remain possible for trusted server code.
 
 Document that Supabase service-role keys must never be exposed to public clients.
+
+
+## Executable Coverage Added
+
+The integration suite currently covers:
+
+- Migration/static schema assumptions.
+- Seed-equivalent data creation.
+- Create target.
+- Create food log.
+- Patch food log while ignoring spoofed `source`/`provider`.
+- Delete food log.
+- Compute dashboard totals.
+- Create saved meal.
+- Resolve saved meal by alias.
+- Log saved meal with serving multiplier.
+- Patch saved meal.
+- Explicit alias replacement.
+- Edited saved meal does not alter historical food logs.
+- Saved meal delete preserves historical food logs and clears `saved_meal_id`.
+- RLS/user isolation assumptions.
+
+Supabase CLI was not installed in this environment, so live local database reset/apply remains a manual verification step.

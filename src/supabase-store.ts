@@ -6,6 +6,7 @@ import {
   normalizeMealQuery,
   nowIso,
   parseNutrition,
+  parseNutritionPatch,
   remaining,
   scaleNutrition,
   similarity,
@@ -25,6 +26,8 @@ import type {
   CreateWeightEntryInput,
   FastLogStore,
   LogSavedMealInput,
+  UpdateFoodLogInput,
+  UpdateSavedMealInput,
   UpdateTargetsInput,
   WeightTrend
 } from './store.ts';
@@ -72,6 +75,40 @@ export class SupabaseStore implements FastLogStore {
       headers: { Prefer: 'return=representation' }
     });
     return rows[0];
+  }
+
+
+
+  async updateFoodLog(user: User, foodLogId: string, input: UpdateFoodLogInput): Promise<FoodLog> {
+    const patch: Record<string, unknown> = { ...parseNutritionPatch(input as Record<string, unknown>) };
+    if ("logged_at" in input) patch.logged_at = input.logged_at;
+    if ("meal_type" in input) patch.meal_type = assertMealType(input.meal_type);
+    if ("label" in input) patch.label = input.label ?? null;
+    if ("raw_input" in input) patch.raw_input = input.raw_input ?? null;
+
+    const rows = await this.request<FoodLog[]>("/food_logs", {
+      method: "PATCH",
+      query: {
+        id: "eq." + foodLogId,
+        user_id: "eq." + user.id
+      },
+      body: patch,
+      headers: { Prefer: "return=representation" }
+    });
+    if (!rows[0]) throw badRequest("Food log not found.");
+    return rows[0];
+  }
+
+  async deleteFoodLog(user: User, foodLogId: string): Promise<void> {
+    const rows = await this.request<FoodLog[]>("/food_logs", {
+      method: "DELETE",
+      query: {
+        id: "eq." + foodLogId,
+        user_id: "eq." + user.id
+      },
+      headers: { Prefer: "return=representation" }
+    });
+    if (!rows[0]) throw badRequest("Food log not found.");
   }
 
   async listFoodLogs(user: User, date: string): Promise<FoodLog[]> {
@@ -168,6 +205,61 @@ export class SupabaseStore implements FastLogStore {
       });
     }
     return { ...meal, aliases };
+  }
+
+
+
+  async updateSavedMeal(user: User, savedMealId: string, input: UpdateSavedMealInput): Promise<SavedMeal> {
+    const patch: Record<string, unknown> = { ...parseNutritionPatch(input as Record<string, unknown>) };
+    if ("name" in input) {
+      if (!input.name || !input.name.trim()) throw badRequest("name cannot be blank.");
+      patch.name = input.name.trim();
+    }
+    if ("default_meal_type" in input) patch.default_meal_type = assertMealType(input.default_meal_type);
+
+    let meal: SavedMeal | null = null;
+    if (Object.keys(patch).length > 0) {
+      const rows = await this.request<SavedMeal[]>("/saved_meals", {
+        method: "PATCH",
+        query: {
+          id: "eq." + savedMealId,
+          user_id: "eq." + user.id
+        },
+        body: patch,
+        headers: { Prefer: "return=representation" }
+      });
+      meal = rows[0] ?? null;
+    } else {
+      meal = (await this.listSavedMeals(user)).find((savedMeal) => savedMeal.id === savedMealId) ?? null;
+    }
+    if (!meal) throw badRequest("Saved meal not found.");
+
+    if ("aliases" in input) {
+      const aliases = [...new Set((input.aliases ?? []).map((alias) => alias.trim()).filter(Boolean))];
+      const normalizedAliases = aliases.map(normalizeMealQuery);
+      if (new Set(normalizedAliases).size !== normalizedAliases.length) throw badRequest("Duplicate aliases are not allowed.");
+
+      await this.request("/saved_meal_aliases", {
+        method: "DELETE",
+        query: {
+          user_id: "eq." + user.id,
+          saved_meal_id: "eq." + savedMealId
+        }
+      });
+
+      if (aliases.length > 0) {
+        await this.request("/saved_meal_aliases", {
+          method: "POST",
+          body: aliases.map((alias) => ({ user_id: user.id, saved_meal_id: savedMealId, alias }))
+        });
+      }
+      meal.aliases = aliases;
+    } else {
+      const refreshed = (await this.listSavedMeals(user)).find((savedMeal) => savedMeal.id === savedMealId);
+      meal.aliases = refreshed?.aliases ?? [];
+    }
+
+    return meal;
   }
 
   async resolveSavedMeal(user: User, query: string): Promise<SavedMealResolution> {

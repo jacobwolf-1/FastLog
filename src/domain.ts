@@ -177,6 +177,23 @@ export function parseNutrition(body: Record<string, unknown>): Nutrition {
   return result;
 }
 
+
+export function parseNutritionPatch(body: Record<string, unknown>): Partial<Nutrition> {
+  const result: Partial<Nutrition> = {};
+
+  if ('calories' in body) {
+    result.calories = Math.round(assertPositiveNumber(body.calories, 'calories'));
+  }
+
+  for (const key of nutritionKeys) {
+    if (key in body) {
+      result[key] = assertNonNegativeOptional(body[key], key);
+    }
+  }
+
+  return result;
+}
+
 export function scaleNutrition(nutrition: Nutrition, multiplier: number): Nutrition {
   const scaled: Nutrition = {
     calories: Math.round(nutrition.calories * multiplier)

@@ -60,6 +60,17 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     return sendJson(response, 201, created);
   }
 
+
+  const foodLogMatch = path.match(/^\/v1\/food-logs\/([^/]+)$/);
+  if (method === "PATCH" && foodLogMatch) {
+    const updated = await store.updateFoodLog(user, decodeURIComponent(foodLogMatch[1]), body);
+    return sendJson(response, 200, updated);
+  }
+
+  if (method === "DELETE" && foodLogMatch) {
+    await store.deleteFoodLog(user, decodeURIComponent(foodLogMatch[1]));
+    return sendJson(response, 200, { deleted: true });
+  }
   if (method === 'GET' && path === '/v1/food-logs') {
     const date = assertDate(requiredQuery(url, 'date'));
     return sendJson(response, 200, { food_logs: await store.listFoodLogs(user, date) });
@@ -109,6 +120,11 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
 
   const savedMealDeleteMatch = path.match(/^\/v1\/saved-meals\/([^/]+)$/);
+
+  if (method === "PATCH" && savedMealDeleteMatch) {
+    const updated = await store.updateSavedMeal(user, decodeURIComponent(savedMealDeleteMatch[1]), body);
+    return sendJson(response, 200, updated);
+  }
   if (method === 'DELETE' && savedMealDeleteMatch) {
     await store.deleteSavedMeal(user, decodeURIComponent(savedMealDeleteMatch[1]));
     return sendJson(response, 200, { deleted: true });

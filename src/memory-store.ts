@@ -10,6 +10,7 @@ import {
   normalizeMealQuery,
   nowIso,
   parseNutrition,
+  parseNutritionPatch,
   remaining,
   scaleNutrition,
   similarity,
@@ -29,6 +30,8 @@ import type {
   CreateWeightEntryInput,
   FastLogStore,
   LogSavedMealInput,
+  UpdateFoodLogInput,
+  UpdateSavedMealInput,
   UpdateTargetsInput,
   WeightTrend
 } from './store.ts';
@@ -75,6 +78,28 @@ export class MemoryStore implements FastLogStore {
 
     this.foodLogs.push(log);
     return log;
+  }
+
+
+
+  async updateFoodLog(user: User, foodLogId: string, input: UpdateFoodLogInput): Promise<FoodLog> {
+    const log = this.foodLogs.find((foodLog) => foodLog.id === foodLogId && foodLog.user_id === user.id);
+    if (!log) throw badRequest('Food log not found.');
+
+    const patch: Partial<FoodLog> = { ...parseNutritionPatch(input as Record<string, unknown>) };
+    if ('logged_at' in input) patch.logged_at = input.logged_at ?? log.logged_at;
+    if ('meal_type' in input) patch.meal_type = assertMealType(input.meal_type);
+    if ('label' in input) patch.label = input.label ?? null;
+    if ('raw_input' in input) patch.raw_input = input.raw_input ?? null;
+
+    Object.assign(log, patch, { updated_at: nowIso() });
+    return log;
+  }
+
+  async deleteFoodLog(user: User, foodLogId: string): Promise<void> {
+    const before = this.foodLogs.length;
+    this.foodLogs = this.foodLogs.filter((foodLog) => !(foodLog.id === foodLogId && foodLog.user_id === user.id));
+    if (this.foodLogs.length === before) throw badRequest('Food log not found.');
   }
 
   async listFoodLogs(user: User, date: string): Promise<FoodLog[]> {
@@ -161,6 +186,45 @@ export class MemoryStore implements FastLogStore {
       updated_at: timestamp
     };
     this.savedMeals.push(meal);
+    return meal;
+  }
+
+
+
+  async updateSavedMeal(user: User, savedMealId: string, input: UpdateSavedMealInput): Promise<SavedMeal> {
+    const meal = this.savedMeals.find((savedMeal) => savedMeal.id === savedMealId && savedMeal.user_id === user.id);
+    if (!meal) throw badRequest('Saved meal not found.');
+
+    if ('name' in input) {
+      if (!input.name || !input.name.trim()) throw badRequest('name cannot be blank.');
+      const normalizedName = normalizeMealQuery(input.name);
+      if (this.savedMeals.some((savedMeal) => savedMeal.user_id === user.id && savedMeal.id !== savedMealId && savedMeal.normalized_name === normalizedName)) {
+        throw badRequest('A saved meal with this name already exists.');
+      }
+      meal.name = input.name.trim();
+      meal.normalized_name = normalizedName;
+    }
+
+    if ('default_meal_type' in input) meal.default_meal_type = assertMealType(input.default_meal_type);
+    Object.assign(meal, parseNutritionPatch(input as Record<string, unknown>));
+
+    if ('aliases' in input) {
+      const aliases = [...new Set((input.aliases ?? []).map((alias) => alias.trim()).filter(Boolean))];
+      const normalizedAliases = aliases.map(normalizeMealQuery);
+      if (new Set(normalizedAliases).size !== normalizedAliases.length) throw badRequest('Duplicate aliases are not allowed.');
+
+      for (const aliasKey of normalizedAliases) {
+        const conflict = this.savedMeals.some((savedMeal) =>
+          savedMeal.user_id === user.id &&
+          savedMeal.id !== savedMealId &&
+          savedMeal.aliases.map(normalizeMealQuery).includes(aliasKey)
+        );
+        if (conflict) throw badRequest('A saved meal alias already exists.');
+      }
+      meal.aliases = aliases;
+    }
+
+    meal.updated_at = nowIso();
     return meal;
   }
 
