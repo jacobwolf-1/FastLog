@@ -1,0 +1,6 @@
+# Xcode build artifacts and per-user state — never commit these.
+build/
+DerivedData/
+*.xcuserstate
+**/xcuserdata/
+.DS_Store

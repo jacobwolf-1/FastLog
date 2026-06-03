@@ -8,3 +8,8 @@ dist/
 build/
 .supabase/
 CLAUDE.md
+.DS_Store
+ios/build/
+DerivedData/
+*.xcuserdata/
+*.xcuserstate

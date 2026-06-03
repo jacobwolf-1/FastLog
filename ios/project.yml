@@ -1,0 +1,28 @@
+# Alternative project definition for XcodeGen (https://github.com/yonyz/XcodeGen).
+# The committed FastLog.xcodeproj already opens directly in Xcode 16+; this file
+# lets you regenerate it deterministically:  cd ios && xcodegen generate
+name: FastLog
+options:
+  bundleIdPrefix: test.example
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  FastLog:
+    type: application
+    platform: iOS
+    sources:
+      - path: FastLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: test.example.fastlog
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: "YES"
+        CODE_SIGN_ENTITLEMENTS: FastLog/FastLog.entitlements
+        INFOPLIST_KEY_NSHealthShareUsageDescription: "FastLog can read your latest body mass from Apple Health to prefill a weight entry. FastLog never writes to Apple Health."
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
