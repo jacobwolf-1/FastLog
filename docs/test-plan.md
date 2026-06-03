@@ -1,6 +1,6 @@
 # Test Plan
 
-This backend now includes executable integration tests in `tests/integration.ts`. Run them with `npm test`. Migration/static FK verification is in `scripts/verify-migration.ts` and runs with `npm run verify:migration`.
+This backend now includes executable integration tests in `tests/integration.ts`. Run them with `npm test`. The local ChatGPT Action smoke flow is in `tests/ai-action-smoke.ts` and runs with `npm run test:ai-action`. Migration/static FK verification is in `scripts/verify-migration.ts` and runs with `npm run verify:migration`.
 
 ## Target Creation
 
@@ -74,6 +74,17 @@ When logging with `serving_multiplier = 1.5`, verify the food log stores:
 
 Verify the food log references `saved_meal_id` and stores `serving_multiplier`.
 
+## ChatGPT Action Smoke Flow
+
+Verify with `npm run test:ai-action`:
+
+- The smoke flow uses memory mode/in-process HTTP and does not require Supabase.
+- Only Action-safe routes are called: `logFood`, `getTodayDashboard`, `updateTargets`, `listSavedMeals`, `resolveSavedMeal`, `logSavedMeal`, and `createSavedMeal`.
+- `GB + Potato` is created with 610 calories, 50g protein, 56g carbs, and 18g fat.
+- Logging `1.5x` stores 915 calories, 75g protein, 84g carbs, and 27g fat.
+- Spoofed request-body `source` and `provider` fields are stripped from audit payloads and do not override server-derived `chatgpt` source/provider.
+- AI audit rows are created for one-off food logs, saved-meal logs, saved-meal creation, and target updates.
+
 ## RLS And User Isolation
 
 Verify:
@@ -105,5 +116,6 @@ The integration suite currently covers:
 - Edited saved meal does not alter historical food logs.
 - Saved meal delete preserves historical food logs and clears `saved_meal_id`.
 - RLS/user isolation assumptions.
+- Local ChatGPT Action smoke flow for targets, saved meals, saved-meal resolution/logging, one-off logging, dashboard totals, spoof stripping, and AI audit rows.
 
 Supabase CLI was not installed in this environment, so live local database reset/apply remains a manual verification step.

@@ -12,6 +12,8 @@ ChatGPT and Claude should use the same authenticated backend API as the iOS app.
 - `logSavedMeal`
 - `createSavedMeal`
 
+The first ChatGPT Action schema intentionally excludes destructive operations, broad edit operations, date-range food-log/dashboard reads, weight entry writes, weight trend reads, and direct Apple Health writes.
+
 ## Saved Meal Logging
 
 When the user says:
@@ -79,7 +81,7 @@ AI should ask confirmation before:
 
 ## Audit Logging
 
-AI-written operations should create `ai_audit_log` rows.
+AI-written operations should create `ai_audit_log` rows. ChatGPT deployments derive `provider=chatgpt` and food-log `source=chatgpt` server-side; Claude deployments derive `provider=claude` and `source=claude`; non-AI/default deployments use `source=manual` and do not create AI audit rows. Client-supplied `source` and `provider` request fields are untrusted and must be ignored or stripped from audit payloads.
 
 Recommended fields:
 

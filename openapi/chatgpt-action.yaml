@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FastLog API
-  version: 0.1.0
+  version: 0.2.0
   description: >
     Restricted ChatGPT Action subset for FastLog macro logging, dashboard reads,
     targets, saved meal templates, saved meal resolution, and saved meal logging.
@@ -175,8 +175,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Saved meal not found.
 components:
   securitySchemes:
     bearerAuth:
@@ -436,7 +434,9 @@ components:
           type: string
           format: date
         targets:
-          $ref: '#/components/schemas/DailyTargets'
+          oneOf:
+            - $ref: '#/components/schemas/DailyTargets'
+            - type: 'null'
         totals:
           $ref: '#/components/schemas/NutritionTotals'
         remaining:

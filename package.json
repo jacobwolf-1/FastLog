@@ -7,6 +7,7 @@
     "dev": "FASTLOG_STORE=memory node --experimental-strip-types src/server.ts",
     "start": "node --experimental-strip-types src/server.ts",
     "test": "node --experimental-strip-types tests/integration.ts",
+    "test:ai-action": "node --experimental-strip-types tests/ai-action-smoke.ts",
     "verify:migration": "node --experimental-strip-types scripts/verify-migration.ts"
   }
 }

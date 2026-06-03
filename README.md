@@ -18,6 +18,7 @@ scripts/
   verify-migration.ts
 tests/
   integration.ts
+  ai-action-smoke.ts
 supabase/
   migrations/
     20260602120000_initial_schema.sql
@@ -147,7 +148,13 @@ Run executable API integration tests:
 npm test
 ```
 
-The test suite starts a local HTTP API server and exercises targets, food logs, dashboard totals, saved meals, saved meal resolution, serving multipliers, saved meal deletion preserving historical logs, AI audit logging, and user isolation assumptions.
+Run the local ChatGPT Action smoke test:
+
+```sh
+npm run test:ai-action
+```
+
+The test suite starts a local HTTP API server and exercises targets, food logs, dashboard totals, saved meals, saved meal resolution, serving multipliers, saved meal deletion preserving historical logs, AI audit logging, and user isolation assumptions. The AI Action smoke test uses only the restricted Action-safe routes and verifies saved-meal resolution, 1.5x saved-meal logging, one-off logging, target updates, server-derived source/provider behavior, and AI audit rows.
 
 ## Full Backend API vs ChatGPT Action Subset
 
@@ -177,7 +184,7 @@ Implemented:
 - Saved meal resolution with exact, normalized, and high-confidence fuzzy matching.
 - AI audit logging for server-derived AI-origin writes.
 - ChatGPT Action writes derive `provider=chatgpt` and `source=chatgpt` server-side.
-- Executable integration tests.
+- Executable integration tests and local AI Action smoke test.
 - OpenAPI schema for the restricted ChatGPT Action subset.
 
 Remaining before frontend work:
