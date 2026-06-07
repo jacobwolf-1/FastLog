@@ -31,6 +31,9 @@ docs/
   PRODUCT_PLAN.md
   api.md
   ai-behavior.md
+  chatgpt-action-setup.md
+  claude-tools.md
+  local-ai-demo.md
   saved-meal-resolution.md
   test-plan.md
 README.md
@@ -171,6 +174,8 @@ The ChatGPT Action schema in `openapi/chatgpt-action.yaml` intentionally exposes
 - `createSavedMeal`
 
 Weight writes, weight trends, deletes, and broad edit operations are backend API concerns, not part of the first Action subset.
+
+ChatGPT Action setup guidance is in `docs/chatgpt-action-setup.md`. Claude parity tooling guidance is in `docs/claude-tools.md`. A local memory-mode AI flow demo is in `docs/local-ai-demo.md`.
 
 ## Current Status
 

@@ -85,6 +85,8 @@ Verify with `npm run test:ai-action`:
 - Spoofed request-body `source` and `provider` fields are stripped from audit payloads and do not override server-derived `chatgpt` source/provider.
 - AI audit rows are created for one-off food logs, saved-meal logs, saved-meal creation, and target updates.
 
+Manual local demo coverage is documented in `docs/local-ai-demo.md`. It demonstrates the same v0.2 flow through curl: memory backend in ChatGPT mode, targets, saved meal creation, saved meal resolution, 1.5x saved-meal logging, dashboard fetch, and expected totals.
+
 ## RLS And User Isolation
 
 Verify:
