@@ -1,6 +1,6 @@
 # Claude Tool Contract
 
-This is the Claude parity artifact for FastLog v0.2B. Claude tools should wrap the same authenticated backend endpoints as the ChatGPT Action and iOS app. Do not add separate Claude-only saved-meal resolution, fuzzy matching, persistence, or product behavior.
+This is the Claude parity artifact for FastLog v0.2B. For deployment and auth planning, see `docs/deployment-auth-plan.md` and `docs/action-deployment-checklist.md`. Claude tools should wrap the same authenticated backend endpoints as the ChatGPT Action and iOS app. Do not add separate Claude-only saved-meal resolution, fuzzy matching, persistence, or product behavior.
 
 Claude-facing tool names use snake_case. The ChatGPT OpenAPI operation IDs remain unchanged in `openapi/chatgpt-action.yaml`.
 

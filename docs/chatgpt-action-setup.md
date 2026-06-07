@@ -20,6 +20,8 @@ Before publishing the Action, replace that server URL with the deployed HTTPS Fa
 
 ## Deployment Prerequisites
 
+See `docs/deployment-auth-plan.md` and `docs/action-deployment-checklist.md` before configuring a real Action.
+
 - Deploy the FastLog backend behind HTTPS.
 - Decide the production auth/token exchange for ChatGPT users.
 - Set the ChatGPT-facing deployment environment:

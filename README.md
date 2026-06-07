@@ -31,8 +31,10 @@ docs/
   PRODUCT_PLAN.md
   api.md
   ai-behavior.md
+  action-deployment-checklist.md
   chatgpt-action-setup.md
   claude-tools.md
+  deployment-auth-plan.md
   local-ai-demo.md
   saved-meal-resolution.md
   test-plan.md
@@ -175,7 +177,7 @@ The ChatGPT Action schema in `openapi/chatgpt-action.yaml` intentionally exposes
 
 Weight writes, weight trends, deletes, and broad edit operations are backend API concerns, not part of the first Action subset.
 
-ChatGPT Action setup guidance is in `docs/chatgpt-action-setup.md`. Claude parity tooling guidance is in `docs/claude-tools.md`. A local memory-mode AI flow demo is in `docs/local-ai-demo.md`.
+ChatGPT Action setup guidance is in `docs/chatgpt-action-setup.md`. Claude parity tooling guidance is in `docs/claude-tools.md`. A local memory-mode AI flow demo is in `docs/local-ai-demo.md`. Deployment and auth planning is in `docs/deployment-auth-plan.md`, with rollout checks in `docs/action-deployment-checklist.md`.
 
 ## Current Status
 
