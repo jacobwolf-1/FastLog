@@ -1,4 +1,5 @@
 import {
+  HttpError,
   assertDate,
   assertMealType,
   assertPositiveNumber,
@@ -12,6 +13,7 @@ import {
   similarity,
   sumLogs,
   todayIsoDate,
+  unauthorized,
   type AiAuditLog,
   type DailyTargets,
   type FoodLog,
@@ -411,26 +413,84 @@ export class SupabaseStore implements FastLogStore {
       body: options.body === undefined ? undefined : JSON.stringify(options.body)
     });
 
+    const text = await readResponseText(response);
     if (!response.ok) {
-      const text = await response.text();
       throw badRequest(text || `Supabase request failed with ${response.status}.`);
     }
 
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    if (response.status === 204 || text.trim() === '') return undefined as T;
+    return parseSupabaseJson<T>(text, `Supabase REST ${options.method ?? 'GET'} ${path}`);
   }
 }
 
 export async function getSupabaseUser(supabaseUrl: string, anonKey: string, bearerToken: string): Promise<User> {
-  const response = await fetch(new URL('/auth/v1/user', supabaseUrl), {
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${bearerToken}`
+  let response: Response;
+  try {
+    response = await fetch(new URL('/auth/v1/user', supabaseUrl), {
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${bearerToken}`
+      }
+    });
+  } catch (error) {
+    logSupabaseAuthFailure({ status: null, contentType: null, body: error instanceof Error ? error.message : String(error) });
+    throw unauthorized('Unable to authenticate Supabase user.');
+  }
+
+  const text = await readResponseText(response);
+  if (!response.ok) {
+    logSupabaseAuthFailure({
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      body: text
+    });
+    throw unauthorized('Unable to authenticate Supabase user.');
+  }
+
+  try {
+    const user = JSON.parse(text) as { id?: string; email?: string | null };
+    if (!user.id) {
+      logSupabaseAuthFailure({
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+        body: text
+      });
+      throw unauthorized('Unable to authenticate Supabase user.');
     }
+    return { id: user.id, email: user.email ?? null };
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    logSupabaseAuthFailure({
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      body: text
+    });
+    throw unauthorized('Unable to authenticate Supabase user.');
+  }
+}
+
+async function readResponseText(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch {
+    return '';
+  }
+}
+
+function parseSupabaseJson<T>(text: string, context: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new HttpError(502, `${context} returned invalid JSON.`);
+  }
+}
+
+function logSupabaseAuthFailure(input: { status: number | null; contentType: string | null; body: string }) {
+  console.error('Supabase auth failed', {
+    status: input.status,
+    contentType: input.contentType,
+    bodyPreview: input.body.slice(0, 200)
   });
-  if (!response.ok) throw badRequest('Unable to authenticate Supabase user.');
-  const user = (await response.json()) as { id: string; email?: string | null };
-  return { id: user.id, email: user.email ?? null };
 }
 
 function found(

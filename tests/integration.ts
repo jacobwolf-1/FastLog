@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
 import { createApp } from "../src/app.ts";
 import { MemoryStore } from "../src/memory-store.ts";
+import { getSupabaseUser } from "../src/supabase-store.ts";
 import type { User } from "../src/domain.ts";
 
 const userA: User = { id: crypto.randomUUID(), email: "a@example.test" };
@@ -13,6 +14,7 @@ const server = createApp({
     const token = request.headers.authorization?.replace("Bearer ", "");
     if (token === "user-a") return userA;
     if (token === "user-b") return userB;
+    if (token === "syntax-error") throw new SyntaxError("upstream syntax boom");
     throw new Error("test auth failed");
   },
   integrationProvider: "chatgpt"
@@ -24,6 +26,9 @@ assert(address && typeof address === "object");
 const baseUrl = "http://127.0.0.1:" + address.port;
 
 try {
+  await testInvalidJsonBodies();
+  await testNonBodySyntaxErrorIsNotInvalidJsonBody();
+  await testSupabaseAuthFailureDoesNotMislabelSyntaxErrors();
   await testMigrationStaticExpectations();
   await testSeedEquivalentWorks();
   await testCreateTarget();
@@ -40,6 +45,66 @@ try {
   console.log("all integration tests passed");
 } finally {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+}
+
+async function testInvalidJsonBodies() {
+  const post = await rawApi("POST", "/v1/food-logs", "{");
+  assert.equal(post.status, 400);
+  assert.equal(post.body.error, "Invalid JSON body.");
+
+  const patch = await rawApi("PATCH", "/v1/targets", "{");
+  assert.equal(patch.status, 400);
+  assert.equal(patch.body.error, "Invalid JSON body.");
+  console.log("ok - invalid POST/PATCH JSON returns request-body error");
+}
+
+async function testNonBodySyntaxErrorIsNotInvalidJsonBody() {
+  const response = await api("GET", "/v1/dashboard/today", undefined, "syntax-error");
+  assert.equal(response.status, 500);
+  assert.equal(response.body.error, "upstream syntax boom");
+  assert.notEqual(response.body.error, "Invalid JSON body.");
+  console.log("ok - non-body SyntaxError is not labeled invalid JSON body");
+}
+
+async function testSupabaseAuthFailureDoesNotMislabelSyntaxErrors() {
+  const originalFetch = globalThis.fetch;
+  const originalConsoleError = console.error;
+  const diagnostics: unknown[][] = [];
+
+  console.error = (...args: unknown[]) => {
+    diagnostics.push(args);
+  };
+
+  try {
+    globalThis.fetch = async () =>
+      new Response("<html>not json</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" }
+      });
+
+    await assert.rejects(
+      () => getSupabaseUser("https://example.supabase.co", "anon-placeholder", "jwt-placeholder"),
+      (error: any) => {
+        assert.equal(error.status, 401);
+        assert.equal(error.message, "Unable to authenticate Supabase user.");
+        assert.notEqual(error.message, "Invalid JSON body.");
+        return true;
+      }
+    );
+
+    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics[0][0], "Supabase auth failed");
+    assert.deepEqual(diagnostics[0][1], {
+      status: 200,
+      contentType: "text/html",
+      bodyPreview: "<html>not json</html>"
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalConsoleError;
+  }
+
+  console.log("ok - Supabase auth parse failures are precise unauthorized errors");
 }
 
 async function testMigrationStaticExpectations() {

@@ -180,7 +180,11 @@ async function readJson(request: IncomingMessage, method: string): Promise<Recor
   const text = Buffer.concat(chunks).toString('utf8');
   if (text.trim() === '') return {};
 
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw badRequest('Invalid JSON body.');
+  }
 }
 
 async function readRequestChunks(request: IncomingMessage): Promise<Buffer[]> {
@@ -263,7 +267,6 @@ function sendJson(response: ServerResponse, status: number, body: unknown) {
 }
 
 function sendError(response: ServerResponse, error: unknown) {
-  if (error instanceof SyntaxError) return sendJson(response, 400, { error: 'Invalid JSON body.' });
   if (error instanceof HttpError) return sendJson(response, error.status, { error: error.message });
   const message = error instanceof Error ? error.message : 'Internal server error.';
   sendJson(response, 500, { error: message });
