@@ -43,7 +43,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
 
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
-  const body = await readJson(request);
+  const method = request.method ?? 'GET';
+  const body = await readJson(request, method);
   const user = options.auth ? await options.auth(request) : await authenticate(request);
   const store = options.store ?? (await storeForRequest(request, user));
   const integrationProvider = integrationProviderFor(options);
@@ -51,7 +52,6 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   const auditPayload = stripClientIntegrationMetadata(body);
   await store.ensureProfile(user);
 
-  const method = request.method ?? 'GET';
   const path = url.pathname;
 
   if (method === 'POST' && path === '/v1/food-logs') {
@@ -168,14 +168,33 @@ async function storeForRequest(request: IncomingMessage, user: User): Promise<Fa
   return new SupabaseStore(requiredEnv('SUPABASE_URL'), requiredEnv('SUPABASE_ANON_KEY'), auth.slice('Bearer '.length));
 }
 
-async function readJson(request: IncomingMessage): Promise<Record<string, any>> {
-  if (request.method === 'GET' || request.method === 'DELETE' || request.method === 'OPTIONS') return {};
+async function readJson(request: IncomingMessage, method: string): Promise<Record<string, any>> {
+  if (method !== 'POST' && method !== 'PATCH' && method !== 'PUT') {
+    await drainRequestBody(request);
+    return {};
+  }
+
+  const chunks = await readRequestChunks(request);
+  if (chunks.length === 0) return {};
+
+  const text = Buffer.concat(chunks).toString('utf8');
+  if (text.trim() === '') return {};
+
+  return JSON.parse(text);
+}
+
+async function readRequestChunks(request: IncomingMessage): Promise<Buffer[]> {
   const chunks: Buffer[] = [];
   for await (const chunk of request) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
-  if (chunks.length === 0) return {};
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return chunks;
+}
+
+async function drainRequestBody(request: IncomingMessage): Promise<void> {
+  for await (const _chunk of request) {
+    // Intentionally ignore bodies on routes that do not use JSON payloads.
+  }
 }
 
 function requiredQuery(url: URL, name: string): string {

@@ -16,6 +16,7 @@ src/
   supabase-store.ts
 scripts/
   verify-migration.ts
+  remote-smoke-test.ts
 tests/
   integration.ts
   ai-action-smoke.ts
@@ -98,6 +99,18 @@ npm start
 ```
 
 Do not manually set `PORT=8787` on Railway. Railway provides the production port automatically.
+
+### Remote Smoke Test
+
+Use a dedicated test user token. Do not commit or print real JWTs.
+
+```sh
+FASTLOG_API_BASE_URL=https://fastlog-production-9626.up.railway.app \
+FASTLOG_TEST_JWT=<user-jwt> \
+npm run test:remote
+```
+
+The remote smoke test calls only authenticated Action-safe routes and writes test targets, a saved meal, and a one-off food log for the authenticated user.
 
 
 ## Supabase Setup

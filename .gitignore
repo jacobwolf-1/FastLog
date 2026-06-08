@@ -13,3 +13,4 @@ ios/build/
 DerivedData/
 *.xcuserdata/
 *.xcuserstate
+supabase/.temp/

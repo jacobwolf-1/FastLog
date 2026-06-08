@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { request as httpRequest } from "node:http";
 import { createApp } from "../src/app.ts";
 import { MemoryStore } from "../src/memory-store.ts";
 import type { User } from "../src/domain.ts";
@@ -30,6 +31,8 @@ try {
   await testPatchFoodLog(patchedLog.id);
   await testDeleteFoodLog();
   const meal = await testCreateAndResolveSavedMeal();
+  await testAuthenticatedGetRoutesWithoutBodies();
+  await testGetJsonBodyIgnoredForDashboardToday();
   const log = await testLogSavedMealWithServingMultiplier(meal.id);
   await testPatchSavedMealAndReplaceAliasesWithoutMutatingHistoricalLog(meal.id, log.id);
   await testSavedMealDeletePreservesHistoricalFoodLogs(meal.id, log.id);
@@ -183,6 +186,35 @@ async function testCreateAndResolveSavedMeal() {
   return create.body;
 }
 
+async function testAuthenticatedGetRoutesWithoutBodies() {
+  const dashboard = await api("GET", "/v1/dashboard/today");
+  assert.equal(dashboard.status, 200);
+  assert.notEqual(dashboard.body.error, "Invalid JSON body.");
+
+  const targets = await api("GET", "/v1/targets/current");
+  assert.equal(targets.status, 200);
+  assert.notEqual(targets.body.error, "Invalid JSON body.");
+
+  const savedMeals = await api("GET", "/v1/saved-meals");
+  assert.equal(savedMeals.status, 200);
+  assert.notEqual(savedMeals.body.error, "Invalid JSON body.");
+
+  const resolved = await api("GET", "/v1/saved-meals/resolve?query=GB%20%2B%20Potato");
+  assert.equal(resolved.status, 200);
+  assert.equal(resolved.body.match_status, "found");
+  assert.notEqual(resolved.body.error, "Invalid JSON body.");
+
+  console.log("ok - authenticated GET routes do not require JSON bodies");
+}
+
+async function testGetJsonBodyIgnoredForDashboardToday() {
+  const response = await rawApi("GET", "/v1/dashboard/today", "{}");
+  assert.equal(response.status, 200);
+  assert.notEqual(response.body.error, "Invalid JSON body.");
+  assert.equal(typeof response.body.totals.calories, "number");
+  console.log("ok - GET dashboard ignores JSON request body");
+}
+
 async function testLogSavedMealWithServingMultiplier(savedMealId: string) {
   const response = await api("POST", "/v1/saved-meals/" + savedMealId + "/log", {
     logged_at: today() + "T18:00:00.000Z",
@@ -277,6 +309,42 @@ async function testRlsIsolationAssumptions() {
   });
   assert.equal(crossUserLog.status, 400);
   console.log("ok - RLS/user isolation assumptions");
+}
+
+async function rawApi(method: string, path: string, rawBody: string, token = "user-a") {
+  const url = new URL(baseUrl + path);
+  const response = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const request = httpRequest(
+      {
+        method,
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname + url.search,
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(rawBody)
+        }
+      },
+      (incoming) => {
+        const chunks: Buffer[] = [];
+        incoming.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        incoming.on("end", () => {
+          resolve({
+            status: incoming.statusCode ?? 0,
+            text: Buffer.concat(chunks).toString("utf8")
+          });
+        });
+      }
+    );
+    request.on("error", reject);
+    request.end(rawBody);
+  });
+
+  return {
+    status: response.status,
+    body: response.text ? JSON.parse(response.text) : null
+  };
 }
 
 async function api(method: string, path: string, body?: unknown, token = "user-a") {
