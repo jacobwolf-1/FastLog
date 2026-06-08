@@ -48,6 +48,7 @@ package.json
 No npm dependencies are required for the current API layer. Node 22+ is required because scripts use native TypeScript type stripping.
 
 1. Copy `.env.example` to `.env` and fill in values.
+
 2. For local in-memory API development:
 
    ```sh
@@ -69,6 +70,35 @@ No npm dependencies are required for the current API layer. Node 22+ is required
    ```
 
 The API expects `Authorization: Bearer <user jwt>`. In memory mode only, use `Bearer dev:<user-id>[:email]`.
+
+## Railway Deployment
+
+Current Railway deployment:
+
+```text
+https://fastlog-production-9626.up.railway.app
+```
+
+Required Railway variables:
+
+```text
+FASTLOG_STORE=supabase
+FASTLOG_INTEGRATION_PROVIDER=chatgpt
+SUPABASE_URL=<Supabase project URL>
+SUPABASE_ANON_KEY=<Supabase anon or publishable key>
+FASTLOG_API_BASE_URL=https://fastlog-production-9626.up.railway.app
+```
+
+Do not set `SUPABASE_SERVICE_ROLE_KEY` for the public ChatGPT Action deployment.
+
+The Railway service should use:
+
+```sh
+npm start
+```
+
+Do not manually set `PORT=8787` on Railway. Railway provides the production port automatically.
+
 
 ## Supabase Setup
 

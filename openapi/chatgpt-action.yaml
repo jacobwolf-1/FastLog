@@ -7,8 +7,8 @@ info:
     targets, saved meal templates, saved meal resolution, and saved meal logging.
     The full backend API also includes non-Action operations documented in docs/api.md.
 servers:
-  - url: https://api.example.com
-    description: Replace with FASTLOG_API_BASE_URL before publishing the action.
+  - url: https://fastlog-production-9626.up.railway.app
+    description: Replaced with production url
 security:
   - bearerAuth: []
 paths:
