@@ -63,8 +63,8 @@ Use this checklist before configuring a real ChatGPT Action or Claude tool integ
 - [ ] Confirm `GET /v1/targets/current` is not exposed.
 - [ ] Confirm no `source`, `provider`, or `user_id` request fields are exposed.
 - [ ] Confirm saved-meal logging by name still requires `resolveSavedMeal` before `logSavedMeal`.
-- [ ] Replace `https://api.example.com` with the chosen HTTPS base URL in the private Action configuration.
-- [ ] Keep the suggested GPT instructions aligned with `docs/chatgpt-action-setup.md`.
+- [ ] Confirm the private Action configuration uses `https://fastlog-production-9626.up.railway.app` as the OpenAPI server URL.
+- [ ] Keep the suggested GPT instructions aligned with `docs/chatgpt-action-setup.md` and run the private checklist in `docs/chatgpt-action-smoke-test.md`.
 
 ## 6. Claude Parity Configuration
 

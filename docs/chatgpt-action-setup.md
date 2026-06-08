@@ -10,17 +10,17 @@ Upload or use:
 openapi/chatgpt-action.yaml
 ```
 
-The schema points to a placeholder server:
+The schema currently points to the Railway deployment:
 
 ```text
-https://api.example.com
+https://fastlog-production-9626.up.railway.app
 ```
 
-Before publishing the Action, replace that server URL with the deployed HTTPS FastLog API base URL.
+If the deployment moves, update the OpenAPI server URL before configuring the Action.
 
 ## Deployment Prerequisites
 
-See `docs/deployment-auth-plan.md` and `docs/action-deployment-checklist.md` before configuring a real Action.
+See `docs/deployment-auth-plan.md`, `docs/action-deployment-checklist.md`, and `docs/chatgpt-action-smoke-test.md` before configuring a real Action.
 
 - Deploy the FastLog backend behind HTTPS.
 - Decide the production auth/token exchange for ChatGPT users.
