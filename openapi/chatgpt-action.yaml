@@ -23,7 +23,62 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateFoodLogRequest'
+              type: object
+              properties:
+                logged_at:
+                  type: string
+                  format: date-time
+                  description: Optional ISO 8601 timestamp for when the food was logged.
+                meal_type:
+                  type: string
+                  enum:
+                    - breakfast
+                    - lunch
+                    - dinner
+                    - snack
+                    - unspecified
+                  default: unspecified
+                  description: Meal bucket for the log. Use unspecified when the user does not say.
+                label:
+                  type: string
+                  description: Short user-facing label for the food entry.
+                calories:
+                  type: integer
+                  minimum: 1
+                  description: Calories to log.
+                protein_g:
+                  type: number
+                  minimum: 0
+                  description: Protein grams.
+                carbs_g:
+                  type: number
+                  minimum: 0
+                  description: Carbohydrate grams.
+                fat_g:
+                  type: number
+                  minimum: 0
+                  description: Fat grams.
+                fiber_g:
+                  type: number
+                  minimum: 0
+                  description: Fiber grams.
+                sodium_mg:
+                  type: number
+                  minimum: 0
+                  description: Sodium milligrams.
+                sugar_g:
+                  type: number
+                  minimum: 0
+                  description: Sugar grams.
+                potassium_mg:
+                  type: number
+                  minimum: 0
+                  description: Potassium milligrams.
+                raw_input:
+                  type: string
+                  description: Original user text that led to this log, when useful for audit context.
+              required:
+                - calories
       responses:
         '201':
           description: Food log created.
@@ -61,7 +116,46 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateTargetsRequest'
+              type: object
+              properties:
+                calories:
+                  type: integer
+                  minimum: 1
+                  description: Daily calorie target.
+                protein_g:
+                  type: number
+                  minimum: 0
+                  description: Daily protein target in grams.
+                carbs_g:
+                  type: number
+                  minimum: 0
+                  description: Daily carbohydrate target in grams.
+                fat_g:
+                  type: number
+                  minimum: 0
+                  description: Daily fat target in grams.
+                fiber_g:
+                  type: number
+                  minimum: 0
+                  description: Daily fiber target in grams.
+                sodium_mg:
+                  type: number
+                  minimum: 0
+                  description: Daily sodium target in milligrams.
+                sugar_g:
+                  type: number
+                  minimum: 0
+                  description: Daily sugar target in grams.
+                potassium_mg:
+                  type: number
+                  minimum: 0
+                  description: Daily potassium target in milligrams.
+                effective_date:
+                  type: string
+                  format: date
+                  description: Optional YYYY-MM-DD date when these targets become effective.
+              required:
+                - calories
       responses:
         '200':
           description: Updated targets.
@@ -106,7 +200,62 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateSavedMealRequest'
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  description: Saved meal template name.
+                aliases:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional alternate names for backend saved-meal resolution.
+                default_meal_type:
+                  type: string
+                  enum:
+                    - breakfast
+                    - lunch
+                    - dinner
+                    - snack
+                    - unspecified
+                  default: unspecified
+                  description: Default meal type to use when logging this saved meal.
+                calories:
+                  type: integer
+                  minimum: 1
+                  description: Calories in one serving of the saved meal.
+                protein_g:
+                  type: number
+                  minimum: 0
+                  description: Protein grams in one serving.
+                carbs_g:
+                  type: number
+                  minimum: 0
+                  description: Carbohydrate grams in one serving.
+                fat_g:
+                  type: number
+                  minimum: 0
+                  description: Fat grams in one serving.
+                fiber_g:
+                  type: number
+                  minimum: 0
+                  description: Fiber grams in one serving.
+                sodium_mg:
+                  type: number
+                  minimum: 0
+                  description: Sodium milligrams in one serving.
+                sugar_g:
+                  type: number
+                  minimum: 0
+                  description: Sugar grams in one serving.
+                potassium_mg:
+                  type: number
+                  minimum: 0
+                  description: Potassium milligrams in one serving.
+              required:
+                - name
+                - calories
       responses:
         '201':
           description: Saved meal created.
@@ -163,7 +312,29 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LogSavedMealRequest'
+              type: object
+              properties:
+                logged_at:
+                  type: string
+                  format: date-time
+                  description: Optional ISO 8601 timestamp for when the saved meal was logged.
+                meal_type:
+                  type: string
+                  enum:
+                    - breakfast
+                    - lunch
+                    - dinner
+                    - snack
+                    - unspecified
+                  description: Meal bucket for this saved-meal log. Defaults to the saved meal default when omitted.
+                serving_multiplier:
+                  type: number
+                  minimum: 0.01
+                  default: 1
+                  description: Multiplier for the saved meal serving, such as 1.5.
+                raw_input:
+                  type: string
+                  description: Original user text that led to this saved-meal log, when useful for audit context.
       responses:
         '201':
           description: Food log created from saved meal.
