@@ -9,6 +9,7 @@
     "test": "node --experimental-strip-types tests/integration.ts",
     "test:ai-action": "node --experimental-strip-types tests/ai-action-smoke.ts",
     "test:remote": "node --experimental-strip-types scripts/remote-smoke-test.ts",
+    "cleanup:smoke": "node --experimental-strip-types scripts/cleanup-smoke-data.ts",
     "verify:migration": "node --experimental-strip-types scripts/verify-migration.ts"
   }
 }

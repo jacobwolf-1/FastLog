@@ -17,6 +17,7 @@ src/
 scripts/
   verify-migration.ts
   remote-smoke-test.ts
+  cleanup-smoke-data.ts
 tests/
   integration.ts
   ai-action-smoke.ts
@@ -37,6 +38,7 @@ docs/
   chatgpt-action-smoke-test.md
   claude-tools.md
   deployment-auth-plan.md
+  dev-cleanup.md
   local-ai-demo.md
   saved-meal-resolution.md
   test-plan.md
@@ -113,6 +115,15 @@ npm run test:remote
 
 The remote smoke test calls only authenticated Action-safe routes and writes test targets, a saved meal, and a one-off food log for the authenticated user. For the private ChatGPT Builder flow, see `docs/chatgpt-action-smoke-test.md`.
 
+### Developer Smoke-Test Cleanup
+
+Smoke-test cleanup uses the normal authenticated API and does not require service-role credentials. Dry run is the default:
+
+```sh
+npm run cleanup:smoke -- --today
+```
+
+Review the matches before using `--confirm-delete`. See `docs/dev-cleanup.md`.
 
 ## Supabase Setup
 
