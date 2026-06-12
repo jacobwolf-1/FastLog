@@ -166,6 +166,8 @@ struct SavedMealEditorView: View {
 }
 
 // Log a saved meal with an optional serving multiplier and meal-type override.
+// Scaled macros preview live before logging; scaling itself happens on the
+// backend via serving_multiplier.
 struct LogSavedMealView: View {
     @Environment(APIClient.self) private var client
     @Environment(\.dismiss) private var dismiss
@@ -182,22 +184,56 @@ struct LogSavedMealView: View {
     }
 
     private var factor: Double { multiplier.optionalDouble ?? 1 }
+    private let quickFactors: [Double] = [0.5, 1, 1.5, 2]
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Scaled totals") {
-                    LabeledContent("Calories", value: Fmt.whole(meal.calories * factor))
-                    LabeledContent("Protein", value: Fmt.grams((meal.proteinG ?? 0) * factor))
-                    LabeledContent("Carbs", value: Fmt.grams((meal.carbsG ?? 0) * factor))
-                    LabeledContent("Fat", value: Fmt.grams((meal.fatG ?? 0) * factor))
-                }
                 Section {
-                    NumberField(title: "Servings", unit: "×", text: $multiplier)
-                    Picker("Meal type", selection: $mealType) {
-                        ForEach(MealType.allCases) { Text($0.label).tag($0) }
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(Fmt.whole(meal.calories * factor))
+                            .font(.system(size: 38, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                        Text("cal").foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowSeparator(.hidden)
+                    HStack {
+                        scaledMetric("Protein", meal.proteinG, tint: FLColor.protein)
+                        scaledMetric("Carbs", meal.carbsG, tint: FLColor.carbs)
+                        scaledMetric("Fat", meal.fatG, tint: FLColor.fat)
                     }
                 }
+
+                Section("Servings") {
+                    HStack(spacing: 8) {
+                        ForEach(quickFactors, id: \.self) { f in
+                            let selected = factor == f
+                            Button {
+                                multiplier = f.trimmedString
+                            } label: {
+                                Text("\(f.trimmedString)×")
+                                    .font(.subheadline.weight(selected ? .semibold : .regular))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().fill(selected
+                                        ? Color.accentColor.opacity(0.18)
+                                        : Color(.tertiarySystemFill)))
+                                    .foregroundStyle(selected ? Color.accentColor : .primary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                    NumberField(title: "Custom", unit: "×", text: $multiplier)
+                }
+
+                Section("Meal type") {
+                    MealTypeChips(selection: $mealType)
+                        .listRowSeparator(.hidden)
+                }
+
                 if let errorText {
                     Section { Text(errorText).foregroundStyle(.red).font(.subheadline) }
                 }
@@ -207,10 +243,27 @@ struct LogSavedMealView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Log") { Task { await log() } }.disabled(factor <= 0 || saving)
+                    Button {
+                        Task { await log() }
+                    } label: {
+                        if saving { ProgressView() } else { Text("Log").fontWeight(.semibold) }
+                    }
+                    .disabled(factor <= 0 || saving)
                 }
             }
         }
+    }
+
+    private func scaledMetric(_ title: String, _ base: Double?, tint: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(base.map { Fmt.whole($0 * factor) } ?? "—")
+                .font(.body.weight(.semibold))
+                .monospacedDigit()
+            Text("\(title) g")
+                .font(.caption2)
+                .foregroundStyle(tint)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func log() async {

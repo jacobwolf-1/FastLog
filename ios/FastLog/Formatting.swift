@@ -25,6 +25,22 @@ enum Fmt {
         return f.string(from: date)
     }
 
+    /// "Today · Jun 10" / "Mon · Jun 9" from a backend "YYYY-MM-DD" day string.
+    static func friendlyDay(fromISODay value: String) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: value) else { return value }
+        let out = DateFormatter()
+        out.setLocalizedDateFormatFromTemplate("MMMd")
+        let day = out.string(from: d)
+        if Calendar.current.isDateInToday(d) { return "Today · \(day)" }
+        let weekday = DateFormatter()
+        weekday.setLocalizedDateFormatFromTemplate("EEE")
+        return "\(weekday.string(from: d)) · \(day)"
+    }
+
     static func timeOfDay(fromISO value: String) -> String {
         guard let d = date(fromISO: value) else { return "" }
         let f = DateFormatter()

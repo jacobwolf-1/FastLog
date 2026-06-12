@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Copy this file to FastLogConfig.plist (gitignored) and fill in your
+	     Supabase project values from Dashboard → Settings → API.
+	     The anon key is the public/publishable key — never the service role key. -->
+	<key>SUPABASE_URL</key>
+	<string>YOUR-PROJECT-URL e.g. https://abcdefghijkl.supabase.co</string>
+	<key>SUPABASE_ANON_KEY</key>
+	<string>YOUR-SUPABASE-ANON-KEY</string>
+</dict>
+</plist>

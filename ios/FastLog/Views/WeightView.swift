@@ -53,15 +53,25 @@ struct WeightView: View {
             Chart(points) { point in
                 if let d = Fmt.date(fromISO: point.measuredAt) {
                     LineMark(x: .value("Date", d), y: .value("Weight", point.weightLb))
+                        .interpolationMethod(.monotone)
                     PointMark(x: .value("Date", d), y: .value("Weight", point.weightLb))
                 }
             }
+            .foregroundStyle(Color.accentColor)
+            .chartYScale(domain: .automatic(includesZero: false))
             .frame(height: 220)
         } else if loading {
             ProgressView().frame(maxWidth: .infinity).frame(height: 220)
         } else {
-            Text("No weight entries in this range.")
-                .foregroundStyle(.secondary).frame(maxWidth: .infinity).frame(height: 220)
+            ContentUnavailableView {
+                Label("No entries in this range", systemImage: "scalemass")
+            } description: {
+                Text("Log a weight to start the trend. You can prefill from Apple Health.")
+            } actions: {
+                Button("Log weight") { entering = true }
+                    .buttonStyle(.bordered)
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 

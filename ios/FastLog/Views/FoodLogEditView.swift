@@ -44,6 +44,29 @@ struct FoodLogEditView: View {
     var body: some View {
         Form {
             Section {
+                LabeledContent("Logged") {
+                    Text("\(Fmt.shortDate(fromISO: log.loggedAt)) · \(Fmt.timeOfDay(fromISO: log.loggedAt))")
+                }
+                LabeledContent("Source") {
+                    HStack(spacing: 6) {
+                        SourceBadge(source: log.source)
+                        if log.source == "manual" { Text("Manual") }
+                    }
+                }
+                if log.savedMealId != nil {
+                    Label {
+                        Text("Logged from a saved meal\(log.servingMultiplier == 1 ? "" : " · \(log.servingMultiplier.trimmedString)× serving")")
+                    } icon: {
+                        Image(systemName: "bookmark.fill")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+            } footer: {
+                Text("Source is set by the server and can't be edited.")
+            }
+
+            Section {
                 TextField("Label", text: $label)
                 Picker("Meal type", selection: $mealType) {
                     ForEach(MealType.allCases) { Text($0.label).tag($0) }

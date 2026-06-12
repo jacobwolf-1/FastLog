@@ -13,10 +13,11 @@ struct TargetsView: View {
     @State private var sugar = ""
     @State private var potassium = ""
 
+    @State private var hasExisting = false
     @State private var loading = false
     @State private var saving = false
     @State private var errorText: String?
-    @State private var savedNote: String?
+    @State private var showSaved = false
 
     private var canSave: Bool { (calories.optionalDouble ?? 0) > 0 }
 
@@ -24,33 +25,71 @@ struct TargetsView: View {
         NavigationStack {
             Form {
                 if loading {
-                    Section { ProgressView() }
+                    Section { ProgressView().frame(maxWidth: .infinity) }
+                } else if !hasExisting {
+                    Section {
+                        Label {
+                            Text("No targets yet — set a calorie target to turn on dashboard progress. Macros and micros are optional.")
+                        } icon: {
+                            Image(systemName: "target")
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    }
                 }
-                Section("Daily targets") {
+
+                Section {
                     NumberField(title: "Calories", unit: "cal", text: $calories)
                     NumberField(title: "Protein", unit: "g", text: $protein)
                     NumberField(title: "Carbs", unit: "g", text: $carbs)
                     NumberField(title: "Fat", unit: "g", text: $fat)
+                } header: {
+                    Text("Daily targets")
+                } footer: {
+                    Text("Calories are required; everything else is optional.")
                 }
+
                 Section("Micronutrients (optional)") {
                     NumberField(title: "Fiber", unit: "g", text: $fiber)
                     NumberField(title: "Sodium", unit: "mg", text: $sodium)
                     NumberField(title: "Sugar", unit: "g", text: $sugar)
                     NumberField(title: "Potassium", unit: "mg", text: $potassium)
                 }
-                if let savedNote {
-                    Section { Label(savedNote, systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
-                }
+
                 if let errorText {
                     Section { Text(errorText).foregroundStyle(.red).font(.subheadline) }
+                }
+
+                Section {
+                    EmptyView()
+                } footer: {
+                    Text("Saved targets take effect today and apply to every day going forward. Past days keep the targets that were active at the time.")
                 }
             }
             .navigationTitle("Targets")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { Task { await save() } }.disabled(!canSave || saving)
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if saving { ProgressView() } else { Text("Save") }
+                    }
+                    .disabled(!canSave || saving)
                 }
             }
+            .overlay(alignment: .bottom) {
+                if showSaved {
+                    Label("Targets saved", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(.regularMaterial, in: Capsule())
+                        .foregroundStyle(.green)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(duration: 0.3), value: showSaved)
             .task { await load() }
         }
     }
@@ -60,6 +99,7 @@ struct TargetsView: View {
         errorText = nil
         do {
             if let t = try await client.currentTargets() {
+                hasExisting = true
                 calories = t.calories.trimmedString
                 protein = t.proteinG?.trimmedString ?? ""
                 carbs = t.carbsG?.trimmedString ?? ""
@@ -68,6 +108,8 @@ struct TargetsView: View {
                 sodium = t.sodiumMg?.trimmedString ?? ""
                 sugar = t.sugarG?.trimmedString ?? ""
                 potassium = t.potassiumMg?.trimmedString ?? ""
+            } else {
+                hasExisting = false
             }
         } catch {
             errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -78,7 +120,6 @@ struct TargetsView: View {
     private func save() async {
         saving = true
         errorText = nil
-        savedNote = nil
         let payload = UpdateTargetsPayload(
             calories: calories.optionalDouble ?? 0,
             proteinG: protein.optionalDouble,
@@ -92,7 +133,12 @@ struct TargetsView: View {
         )
         do {
             _ = try await client.updateTargets(payload)
-            savedNote = "Targets saved."
+            hasExisting = true
+            showSaved = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                showSaved = false
+            }
         } catch {
             errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }

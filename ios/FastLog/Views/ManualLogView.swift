@@ -2,11 +2,17 @@ import SwiftUI
 
 // Manual macro entry → POST /v1/food-logs. The whole point of FastLog:
 // "what numbers do you want to log?" — no food database, no search.
+// Optimized for speed: calories focused on open, chips not pickers,
+// micros tucked away.
 struct ManualLogView: View {
     @Environment(APIClient.self) private var client
     @Environment(\.dismiss) private var dismiss
 
     var onSaved: () -> Void
+
+    private enum Field: Hashable {
+        case calories, label, protein, carbs, fat, fiber, sodium, sugar, potassium
+    }
 
     @State private var label = ""
     @State private var mealType: MealType = .unspecified
@@ -22,59 +28,137 @@ struct ManualLogView: View {
 
     @State private var saving = false
     @State private var errorText: String?
+    @FocusState private var focus: Field?
 
     private var caloriesValid: Bool { (calories.optionalDouble ?? 0) > 0 }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Label (optional)", text: $label)
-                    Picker("Meal type", selection: $mealType) {
-                        ForEach(MealType.allCases) { Text($0.label).tag($0) }
+            ScrollView {
+                VStack(spacing: 14) {
+                    caloriesHero
+                    MealTypeChips(selection: $mealType)
+
+                    TextField("Label (optional) — e.g. Chicken & rice", text: $label)
+                        .focused($focus, equals: .label)
+                        .flCard()
+
+                    macroFields
+
+                    DisclosureGroup(isExpanded: $showMicros) {
+                        VStack(spacing: 2) {
+                            NumberField(title: "Fiber", unit: "g", text: $fiber)
+                                .focused($focus, equals: .fiber)
+                            NumberField(title: "Sodium", unit: "mg", text: $sodium)
+                                .focused($focus, equals: .sodium)
+                            NumberField(title: "Sugar", unit: "g", text: $sugar)
+                                .focused($focus, equals: .sugar)
+                            NumberField(title: "Potassium", unit: "mg", text: $potassium)
+                                .focused($focus, equals: .potassium)
+                        }
+                        .padding(.top, 6)
+                    } label: {
+                        Text("Micronutrients")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .flCard()
+
+                    if let errorText {
+                        Label(errorText, systemImage: "exclamationmark.triangle.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-
-                Section("Macros") {
-                    NumberField(title: "Calories", unit: "cal", text: $calories)
-                    NumberField(title: "Protein", unit: "g", text: $protein)
-                    NumberField(title: "Carbs", unit: "g", text: $carbs)
-                    NumberField(title: "Fat", unit: "g", text: $fat)
-                }
-
-                Section {
-                    DisclosureGroup("Micronutrients (optional)", isExpanded: $showMicros) {
-                        NumberField(title: "Fiber", unit: "g", text: $fiber)
-                        NumberField(title: "Sodium", unit: "mg", text: $sodium)
-                        NumberField(title: "Sugar", unit: "g", text: $sugar)
-                        NumberField(title: "Potassium", unit: "mg", text: $potassium)
-                    }
-                }
-
-                if let errorText {
-                    Section { Text(errorText).foregroundStyle(.red).font(.subheadline) }
-                }
+                .padding()
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Log Food")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { Task { await save() } }
-                        .disabled(!caloriesValid || saving)
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focus = nil }
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    Task { await save() }
+                } label: {
+                    Group {
+                        if saving {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Log it").fontWeight(.semibold)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!caloriesValid || saving)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+                .background(.bar)
+            }
+            .onAppear { focus = .calories }
         }
+    }
+
+    private var caloriesHero: some View {
+        VStack(spacing: 2) {
+            TextField("0", text: $calories)
+                .keyboardType(.decimalPad)
+                .focused($focus, equals: .calories)
+                .font(.system(size: 54, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+            Text("calories")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+        .flCard()
+    }
+
+    private var macroFields: some View {
+        HStack(spacing: 10) {
+            macroField("Protein", tint: FLColor.protein, text: $protein, field: .protein)
+            macroField("Carbs", tint: FLColor.carbs, text: $carbs, field: .carbs)
+            macroField("Fat", tint: FLColor.fat, text: $fat, field: .fat)
+        }
+    }
+
+    private func macroField(_ title: String, tint: Color, text: Binding<String>, field: Field) -> some View {
+        VStack(spacing: 4) {
+            TextField("—", text: text)
+                .keyboardType(.decimalPad)
+                .focused($focus, equals: field)
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+            Text("\(title) g")
+                .font(.caption)
+                .foregroundStyle(tint)
+        }
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func save() async {
         saving = true
         errorText = nil
+        let trimmedLabel = label.trimmingCharacters(in: .whitespaces)
         let payload = CreateFoodLogPayload(
             mealType: mealType == .unspecified ? nil : mealType.rawValue,
-            label: label.isEmpty ? nil : label,
+            label: trimmedLabel.isEmpty ? nil : trimmedLabel,
             calories: calories.optionalDouble ?? 0,
             proteinG: protein.optionalDouble,
             carbsG: carbs.optionalDouble,

@@ -227,10 +227,12 @@ private struct DeletedBody: Decodable { let deleted: Bool }
 @Observable
 final class APIClient {
     private let settings: AppSettings
+    private let auth: AuthManager
     private let session: URLSession
 
-    init(settings: AppSettings, session: URLSession = .shared) {
+    init(settings: AppSettings, auth: AuthManager, session: URLSession = .shared) {
         self.settings = settings
+        self.auth = auth
         self.session = session
     }
 
@@ -350,7 +352,8 @@ final class APIClient {
         _ method: String,
         _ path: String,
         query: [URLQueryItem],
-        body: Encodable?
+        body: Encodable?,
+        retryOnUnauthorized: Bool = true
     ) async throws -> Data {
         let base = settings.baseURL.trimmingCharacters(in: .whitespaces)
         guard var components = URLComponents(string: base) else { throw APIError.invalidBaseURL }
@@ -360,9 +363,13 @@ final class APIClient {
         if !query.isEmpty { components.queryItems = query }
         guard let url = components.url else { throw APIError.invalidBaseURL }
 
+        // Developer mode uses the manually entered bearer token; otherwise the
+        // Supabase session supplies (and refreshes) the user JWT.
+        let token = settings.devModeEnabled ? settings.devToken : try await auth.validToken()
+
         var req = URLRequest(url: url)
         req.httpMethod = method
-        req.setValue("Bearer \(settings.token)", forHTTPHeaderField: "Authorization")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try Self.encoder.encode(AnyEncodable(body))
@@ -380,6 +387,12 @@ final class APIClient {
             throw APIError.transport("Missing HTTP response.")
         }
         guard (200..<300).contains(http.statusCode) else {
+            // A 401 with a not-yet-expired token usually means it was revoked;
+            // force one refresh and retry before surfacing the error.
+            if http.statusCode == 401, retryOnUnauthorized, !settings.devModeEnabled {
+                _ = try await auth.refresh()
+                return try await send(method, path, query: query, body: body, retryOnUnauthorized: false)
+            }
             let message = (try? Self.decoder.decode(ServerErrorBody.self, from: data))?.error
                 ?? String(data: data, encoding: .utf8) ?? "Unknown error"
             throw APIError.server(status: http.statusCode, message: message)

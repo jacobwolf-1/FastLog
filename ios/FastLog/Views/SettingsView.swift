@@ -2,40 +2,31 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(AuthManager.self) private var auth
     @Environment(APIClient.self) private var client
     @Environment(HealthKitManager.self) private var health
 
     @State private var testing = false
     @State private var testResult: String?
     @State private var testOK = false
+    @State private var showingDevOptions = false
+    @State private var signingOut = false
 
     var body: some View {
         @Bindable var settings = settings
         return NavigationStack {
             Form {
+                accountSection
+
                 Section {
-                    TextField("http://localhost:8787", text: $settings.baseURL)
+                    TextField(AppConfig.defaultAPIBaseURL, text: $settings.baseURL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                } header: {
-                    Text("Backend base URL")
-                } footer: {
-                    Text("For Simulator use http://localhost:8787. On a physical device use your Mac's LAN IP, e.g. http://192.168.1.10:8787.")
-                }
-
-                Section {
-                    TextField("dev:user-a:user-a@example.test", text: $settings.token, axis: .vertical)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                } header: {
-                    Text("Auth token")
-                } footer: {
-                    Text("Sent as `Authorization: Bearer <token>`. In memory mode use dev:<user-id>[:email].")
-                }
-
-                Section {
-                    Button { Task { await testConnection() } } label: {
+                        .font(.callout)
+                    Button {
+                        Task { await testConnection() }
+                    } label: {
                         HStack {
                             Text("Test connection")
                             Spacer()
@@ -48,6 +39,10 @@ struct SettingsView: View {
                             .foregroundStyle(testOK ? .green : .red)
                             .font(.subheadline)
                     }
+                } header: {
+                    Text("Backend")
+                } footer: {
+                    Text("All data lives in the FastLog backend. The default is the deployed production server.")
                 }
 
                 Section {
@@ -58,20 +53,60 @@ struct SettingsView: View {
                 } header: {
                     Text("Apple Health")
                 } footer: {
-                    Text("Read-only. iOS does not report whether read access was granted; the Weight screen shows whether a sample was actually found. Nothing is written to Apple Health.")
+                    Text("Read-only, on this device only. FastLog never writes to Apple Health, and AI integrations can't touch it. iOS doesn't report whether read access was granted; the Weight screen shows whether a sample was found.")
                 }
 
                 Section {
-                    Button("Reset to defaults") {
-                        settings.baseURL = AppSettings.defaultBaseURL
-                        settings.token = AppSettings.defaultToken
-                        testResult = nil
+                    Button("Developer options") { showingDevOptions = true }
+                    if settings.devModeEnabled {
+                        Label("Manual token mode is on", systemImage: "wrench.and.screwdriver.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
                     }
+                } footer: {
+                    Text("Manual bearer-token mode for local backend development.")
+                }
+
+                Section("About") {
+                    LabeledContent("Version", value: appVersion)
                 }
             }
             .navigationTitle("Settings")
+            .sheet(isPresented: $showingDevOptions) {
+                DeveloperOptionsView()
+            }
             .onAppear { health.refreshStatus() }
         }
+    }
+
+    @ViewBuilder
+    private var accountSection: some View {
+        Section("Account") {
+            if settings.devModeEnabled {
+                LabeledContent("Mode", value: "Developer token")
+            } else if case .signedIn = auth.state {
+                LabeledContent("Signed in as", value: auth.sessionEmail ?? "Supabase user")
+                Button(role: .destructive) {
+                    Task {
+                        signingOut = true
+                        await auth.signOut()
+                        signingOut = false
+                    }
+                } label: {
+                    if signingOut { ProgressView() } else { Text("Sign Out") }
+                }
+                .disabled(signingOut)
+            } else {
+                LabeledContent("Status", value: "Signed out")
+            }
+        }
+    }
+
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(version) (\(build))"
     }
 
     private var healthStatusText: String {

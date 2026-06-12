@@ -4,3 +4,6 @@ DerivedData/
 *.xcuserstate
 **/xcuserdata/
 .DS_Store
+
+# Local Supabase credentials — copy FastLogConfig.example.plist and fill in.
+FastLog/FastLogConfig.plist
