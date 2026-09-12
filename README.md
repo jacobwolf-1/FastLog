@@ -1,257 +1,137 @@
-# FastLog Backend
+# FastLog
 
-FastLog is a minimal AI-native macro dashboard backend. It is the shared API and data layer for the future iOS app, ChatGPT Actions, Claude tools, Apple Shortcuts, and other clients.
+A minimal, AI-native macro-tracking API. FastLog is deliberately **not** a food
+database or a diet coach — it answers one question, *"what numbers do you want
+to log?"*, and exposes a small, safe surface for an AI assistant (or an iOS app)
+to log them.
 
-This pass includes the Supabase/Postgres schema, Row Level Security policies, seed data, a dependency-free TypeScript REST API, executable integration tests, API documentation, AI behavior rules, and a ChatGPT Action OpenAPI subset.
+The interesting part is the **ChatGPT Custom GPT integration**: a GPT can write
+food logs, update targets, and resolve saved meals through a deliberately narrow,
+tamper-resistant API. The rest of this README shows how that path is kept safe —
+and how to run the whole thing locally in about 30 seconds, with no database and
+no keys.
 
-## Project Structure
+## Headline: a ChatGPT Action that can't lie about who it is
 
-```text
-src/
-  app.ts
-  server.ts
-  domain.ts
-  store.ts
-  memory-store.ts
-  supabase-store.ts
-scripts/
-  verify-migration.ts
-  remote-smoke-test.ts
-  cleanup-smoke-data.ts
-tests/
-  integration.ts
-  ai-action-smoke.ts
-supabase/
-  migrations/
-    20260602120000_initial_schema.sql
-  seed.sql
-  functions/
-    README.md
-openapi/
-  chatgpt-action.yaml
-docs/
-  PRODUCT_PLAN.md
-  api.md
-  ai-behavior.md
-  action-deployment-checklist.md
-  chatgpt-action-setup.md
-  chatgpt-action-smoke-test.md
-  claude-tools.md
-  deployment-auth-plan.md
-  dev-cleanup.md
-  local-ai-demo.md
-  saved-meal-resolution.md
-  test-plan.md
-README.md
-.env.example
-package.json
-```
+A ChatGPT Custom GPT talks to FastLog through an OpenAPI **subset**, not the full
+backend. The design goal: *let an AI write to a user's log without letting any
+client forge an AI-origin write or reach beyond what an assistant should touch.*
+Four properties enforce that:
 
-## Setup
+- **Action-safe route subset.** [`openapi/chatgpt-action.yaml`](openapi/chatgpt-action.yaml)
+  exposes only seven operations — `logFood`, `getTodayDashboard`, `updateTargets`,
+  `resolveSavedMeal`, `logSavedMeal`, `createSavedMeal`, `listSavedMeals`. No
+  deletes, no broad edits, no weight writes, no date-range reads.
+- **Server-derived provenance.** A client cannot claim "this write came from
+  ChatGPT." The `source`/`provider` fields are *not in the request schema* — the
+  server stamps them itself from deployment context. A normal API write is
+  `source=manual`; a write on the ChatGPT-facing deployment is `source=chatgpt`.
+  Spoofed `source`/`provider` in a request body are ignored.
+- **AI audit log.** Every AI-origin write records an `ai_audit_log` row (provider,
+  operation, user), so AI-created data stays attributable after the fact.
+- **Per-user isolation via RLS.** The Supabase-backed store uses user-scoped
+  bearer tokens plus the anon key, so Postgres Row Level Security — not app code —
+  blocks one user from reading or writing another user's data.
 
-No npm dependencies are required for the current API layer. Node 22+ is required because scripts use native TypeScript type stripping.
+You don't have to take my word for any of it: there's an executable test that
+exercises this exact path (below).
 
-1. Copy `.env.example` to `.env` and fill in values.
+## Quickstart (≈30 seconds, no database, no keys)
 
-2. For local in-memory API development:
-
-   ```sh
-   FASTLOG_STORE=memory npm run dev
-   ```
-
-3. For Supabase-backed API development, set:
-
-   ```text
-   FASTLOG_STORE=supabase
-   SUPABASE_URL=
-   SUPABASE_ANON_KEY=
-   ```
-
-   Then run:
-
-   ```sh
-   npm start
-   ```
-
-The API expects `Authorization: Bearer <user jwt>`. In memory mode only, use `Bearer dev:<user-id>[:email]`.
-
-## Railway Deployment
-
-Current Railway deployment:
-
-```text
-https://fastlog-production-9626.up.railway.app
-```
-
-Required Railway variables:
-
-```text
-FASTLOG_STORE=supabase
-FASTLOG_INTEGRATION_PROVIDER=chatgpt
-SUPABASE_URL=<Supabase project URL>
-SUPABASE_ANON_KEY=<Supabase anon or publishable key>
-FASTLOG_API_BASE_URL=https://fastlog-production-9626.up.railway.app
-```
-
-Do not set `SUPABASE_SERVICE_ROLE_KEY` for the public ChatGPT Action deployment.
-
-The Railway service should use:
+**Requires Node 22+.** The API layer is dependency-free — there is nothing to
+`npm install`.
 
 ```sh
-npm start
+git clone https://github.com/jacobwolf-1/FastLog.git
+cd FastLog
+npm run dev          # in-memory mode, listening on http://localhost:8787
 ```
 
-Do not manually set `PORT=8787` on Railway. Railway provides the production port automatically.
-
-### Remote Smoke Test
-
-Use a dedicated test user token. Do not commit or print real JWTs.
+In another terminal:
 
 ```sh
-FASTLOG_API_BASE_URL=https://fastlog-production-9626.up.railway.app \
-FASTLOG_TEST_JWT=<user-jwt> \
-npm run test:remote
+# read current targets (null for a fresh user)
+curl -s http://localhost:8787/v1/targets/current \
+  -H 'Authorization: Bearer dev:user-a:user-a@example.test'
+
+# log a one-off entry
+curl -s -X POST http://localhost:8787/v1/food-logs \
+  -H 'Authorization: Bearer dev:user-a:user-a@example.test' \
+  -H 'Content-Type: application/json' \
+  -d '{"calories":500,"protein_g":40,"carbs_g":45,"fat_g":15,"label":"lunch"}'
 ```
 
-The remote smoke test calls only authenticated Action-safe routes and writes test targets, a saved meal, and a one-off food log for the authenticated user. For the private ChatGPT Builder flow, see `docs/chatgpt-action-smoke-test.md`.
+In memory mode only, auth is a dev token of the form `Bearer dev:<user-id>[:email]`
+— no real JWT needed.
 
-### Developer Smoke-Test Cleanup
+## See the AI write path yourself
 
-Smoke-test cleanup uses the normal authenticated API and does not require service-role credentials. Dry run is the default:
-
-```sh
-npm run cleanup:smoke -- --today
-```
-
-Review the matches before using `--confirm-delete`. See `docs/dev-cleanup.md`.
-
-## Supabase Setup
-
-Install the Supabase CLI if you want local database verification:
-
-```sh
-npm install -g supabase
-```
-
-For a true local reset/apply from scratch, run:
-
-```sh
-supabase start
-supabase db reset
-```
-
-Apply migrations to a linked remote Supabase project with:
-
-```sh
-supabase db push
-```
-
-Seed data requires at least one local `auth.users` row. The seed attaches demo data to the first auth user found:
-
-```sh
-supabase db seed
-```
-
-## Environment Variables
-
-```text
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-FASTLOG_API_BASE_URL=
-FASTLOG_STORE=supabase|memory
-FASTLOG_INTEGRATION_PROVIDER=chatgpt|claude
-PORT=8787
-```
-
-`SUPABASE_SERVICE_ROLE_KEY` is server-side only. Do not expose it to iOS clients, ChatGPT Actions, browsers, or public frontend bundles. The implemented REST layer uses user bearer tokens plus the anon key so Supabase RLS enforces user isolation.
-
-## Local Backend/API
-
-Run an in-memory local server:
-
-```sh
-FASTLOG_STORE=memory npm run dev
-```
-
-Example request:
-
-```sh
-curl -s http://localhost:8787/v1/targets/current   -H 'Authorization: Bearer dev:user-a:user-a@example.test'
-```
-
-Run a Supabase-backed server:
-
-```sh
-FASTLOG_STORE=supabase npm start
-```
-
-Run a ChatGPT Action-facing deployment by setting server-side integration context:
-
-```sh
-FASTLOG_INTEGRATION_PROVIDER=chatgpt npm start
-```
-
-Do not expose `source` or `provider` in the ChatGPT Action request schema. The server derives both as `chatgpt` for that deployment and ignores spoofed request-body metadata.
-
-## Tests
-
-Run migration verification:
-
-```sh
-npm run verify:migration
-```
-
-Run executable API integration tests:
-
-```sh
-npm test
-```
-
-Run the local ChatGPT Action smoke test:
+The ChatGPT Action flow is backed by an executable smoke test that needs **no
+hosting, no ChatGPT account, and no credentials**. It boots the API in memory
+mode and drives the exact Action-safe routes a GPT would call:
 
 ```sh
 npm run test:ai-action
 ```
 
-The test suite starts a local HTTP API server and exercises targets, food logs, dashboard totals, saved meals, saved meal resolution, serving multipliers, saved meal deletion preserving historical logs, AI audit logging, and user isolation assumptions. The AI Action smoke test uses only the restricted Action-safe routes and verifies saved-meal resolution, 1.5x saved-meal logging, one-off logging, target updates, server-derived source/provider behavior, and AI audit rows.
+It verifies saved-meal resolution, 1.5× saved-meal logging, one-off logging,
+target updates, the **server-derived `source`/`provider`** behavior (including
+ignoring spoofed values), and that AI audit rows get written.
 
-## Full Backend API vs ChatGPT Action Subset
+The full integration suite covers the rest — dashboard math, saved-meal alias
+cascades, history preservation on saved-meal delete, and user-isolation
+assumptions:
 
-The full backend API includes food logs, dashboard, targets, saved meals, weight entries, and weight trends. See `docs/api.md`.
+```sh
+npm test
+```
 
-The ChatGPT Action schema in `openapi/chatgpt-action.yaml` intentionally exposes only Action-safe operations:
+Both pass with no setup.
 
-- `logFood`
-- `getTodayDashboard`
-- `updateTargets`
-- `listSavedMeals`
-- `resolveSavedMeal`
-- `logSavedMeal`
-- `createSavedMeal`
+## How it fits together
 
-Weight writes, weight trends, deletes, and broad edit operations are backend API concerns, not part of the first Action subset.
+```text
+src/
+  server.ts          # tiny dependency-free HTTP layer
+  app.ts             # routing + request handling
+  domain.ts          # core domain logic (macros, dashboard totals, saved meals)
+  store.ts           # store interface
+  memory-store.ts    # in-memory store (dev + tests)
+  supabase-store.ts  # Supabase/Postgres store (RLS-enforced)
+openapi/
+  chatgpt-action.yaml  # the restricted ChatGPT Action subset
+supabase/
+  migrations/          # schema + Row Level Security policies
+docs/                  # API reference, AI behavior rules, setup guides
+ios/                   # SwiftUI MVP client (drives the same API)
+```
 
-ChatGPT Action setup guidance is in `docs/chatgpt-action-setup.md`, with the private GPT Builder smoke-test flow in `docs/chatgpt-action-smoke-test.md`. Claude parity tooling guidance is in `docs/claude-tools.md`. A local memory-mode AI flow demo is in `docs/local-ai-demo.md`. Deployment and auth planning is in `docs/deployment-auth-plan.md`, with rollout checks in `docs/action-deployment-checklist.md`.
+- **Full API vs. Action subset** — the backend also serves food-log edits,
+  deletes, weight entries, and weight trends. Those are intentionally *not* in
+  the ChatGPT Action surface. See [`docs/api.md`](docs/api.md).
+- **iOS app** — a SwiftUI MVP that drives the same API and can read body mass
+  from HealthKit locally (optional; the app works without it). See
+  [`ios/README.md`](ios/README.md).
+- **AI behavior rules** — [`docs/ai-behavior.md`](docs/ai-behavior.md); ChatGPT
+  wiring in [`docs/chatgpt-action-setup.md`](docs/chatgpt-action-setup.md).
 
-## Current Status
+## Deploy anywhere (optional)
 
-Implemented:
+Nothing above needs a server. To run against real data instead of memory mode,
+point it at a Supabase project and start it on any Node host:
 
-- Supabase schema and RLS migration.
-- Saved meal alias cascade and food log history preservation on saved meal delete.
-- Dependency-free TypeScript REST API.
-- Supabase-backed store using user-scoped RLS.
-- In-memory store for local development and tests.
-- Saved meal resolution with exact, normalized, and high-confidence fuzzy matching.
-- AI audit logging for server-derived AI-origin writes.
-- ChatGPT Action writes derive `provider=chatgpt` and `source=chatgpt` server-side.
-- Executable integration tests and local AI Action smoke test.
-- OpenAPI schema for the restricted ChatGPT Action subset.
+```sh
+FASTLOG_STORE=supabase \
+SUPABASE_URL=<your project url> \
+SUPABASE_ANON_KEY=<your anon/publishable key> \
+npm start
+```
 
-Remaining before frontend work:
+`SUPABASE_SERVICE_ROLE_KEY` is server-side only and is never needed by the API
+layer, iOS, or the ChatGPT Action — the design relies on user bearer tokens plus
+the anon key so RLS enforces ownership. For a ChatGPT-facing deployment, also set
+`FASTLOG_INTEGRATION_PROVIDER=chatgpt` so writes are stamped server-side.
 
-- Install/run Supabase CLI locally and apply the migration from scratch against a real local database.
-- Deploy the API or convert it to Supabase Edge Functions if that becomes preferable.
-- Validate the ChatGPT Action schema against the deployed API URL.
-- Decide production auth/token exchange for ChatGPT and Claude connections.
+## License
+
+MIT — see [LICENSE](LICENSE).

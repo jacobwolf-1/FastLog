@@ -10,13 +10,13 @@ Upload or use:
 openapi/chatgpt-action.yaml
 ```
 
-The schema currently points to the Railway deployment:
+The schema ships with a placeholder server URL:
 
 ```text
-https://fastlog-production-9626.up.railway.app
+https://your-deployment.example
 ```
 
-If the deployment moves, update the OpenAPI server URL before configuring the Action.
+Set the OpenAPI `servers` URL to your backend's public HTTPS URL before configuring the Action.
 
 ## Deployment Prerequisites
 

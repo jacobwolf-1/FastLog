@@ -6,8 +6,9 @@ import Foundation
 // holds placeholders, Supabase auth reports "not configured" and the app can
 // still run in developer token mode.
 enum AppConfig {
-    /// Deployed Railway backend. Not a secret; safe to commit.
-    static let defaultAPIBaseURL = "https://fastlog-production-9626.up.railway.app"
+    /// Default backend base URL. Points at the local dev server; override at
+    /// runtime in Developer options, or ship your own deployment's URL.
+    static let defaultAPIBaseURL = "http://localhost:8787"
 
     static let supabaseURL: String? = value(for: "SUPABASE_URL")
     static let supabaseAnonKey: String? = value(for: "SUPABASE_ANON_KEY")

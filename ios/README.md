@@ -12,8 +12,9 @@ saved-meal fuzzy matching).
 ## Auth setup (primary path)
 
 The app signs in through Supabase Auth (email/password) and sends the user's
-Supabase JWT as `Authorization: Bearer <token>` to the deployed backend
-(`https://fastlog-production-9626.up.railway.app` by default).
+Supabase JWT as `Authorization: Bearer <token>` to the configured backend
+(`http://localhost:8787` by default — change it in Developer options, or point
+it at your own deployment).
 
 1. Copy `FastLog/FastLogConfig.example.plist` to `FastLog/FastLogConfig.plist`
    (it is gitignored — never commit the real file).

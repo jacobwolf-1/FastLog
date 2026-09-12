@@ -7,7 +7,7 @@ The cleanup script uses the normal FastLog REST API with a user bearer token. It
 ## Required Environment
 
 ```sh
-export FASTLOG_API_BASE_URL=https://fastlog-production-9626.up.railway.app
+export FASTLOG_API_BASE_URL=https://your-deployment.example
 export FASTLOG_TEST_JWT=<temporary-user-jwt>
 ```
 

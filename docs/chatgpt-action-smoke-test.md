@@ -1,9 +1,9 @@
 # ChatGPT Action Smoke Test
 
-This is the private smoke-test flow for the deployed FastLog API:
+This is the private smoke-test flow for a deployed FastLog API:
 
 ```text
-https://fastlog-production-9626.up.railway.app
+https://your-deployment.example
 ```
 
 This uses a temporary Supabase user JWT as an API-key bearer token in a private GPT. It is not production auth. Do not use this for real user-facing distribution. Production still needs OAuth or another per-user token exchange before broader use.
@@ -12,8 +12,8 @@ Do not paste JWTs into logs, docs, GitHub, screenshots, Codex, or support thread
 
 ## Before You Start
 
-- Confirm Railway is deployed with `FASTLOG_INTEGRATION_PROVIDER=chatgpt`.
-- Confirm `openapi/chatgpt-action.yaml` has the Railway server URL.
+- Confirm your backend is deployed with `FASTLOG_INTEGRATION_PROVIDER=chatgpt`.
+- Confirm `openapi/chatgpt-action.yaml` has your deployment's server URL.
 - Confirm the test user already exists in Supabase.
 - Refresh a temporary Supabase JWT locally using your normal private/local auth flow.
 - Keep the JWT outside Git and outside docs.
@@ -87,7 +87,7 @@ Confirm the dashboard updates.
 
 `401 Unable to authenticate Supabase user.`
 
-Refresh the JWT. Confirm Railway `SUPABASE_URL` and `SUPABASE_ANON_KEY` match the same Supabase project used to issue the JWT. Do not paste the JWT or keys into logs, docs, GitHub, or Codex.
+Refresh the JWT. Confirm your deployment's `SUPABASE_URL` and `SUPABASE_ANON_KEY` match the same Supabase project used to issue the JWT. Do not paste the JWT or keys into logs, docs, GitHub, or Codex.
 
 `400` schema validation error in GPT Builder.
 
@@ -95,10 +95,10 @@ Inspect `openapi/chatgpt-action.yaml` for a path, method, parameter, or request 
 
 Action calls the wrong endpoint.
 
-Check that the OpenAPI `servers` URL is exactly:
+Check that the OpenAPI `servers` URL exactly matches your deployed backend:
 
 ```text
-https://fastlog-production-9626.up.railway.app
+https://your-deployment.example
 ```
 
 Saved meal not found.
@@ -111,7 +111,7 @@ Refresh the token locally and update the private Action auth token.
 
 Unexpected source value.
 
-Confirm the Railway deployment has:
+Confirm your deployment has:
 
 ```text
 FASTLOG_INTEGRATION_PROVIDER=chatgpt

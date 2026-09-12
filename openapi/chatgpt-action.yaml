@@ -7,8 +7,8 @@ info:
     targets, saved meal templates, saved meal resolution, and saved meal logging.
     The full backend API also includes non-Action operations documented in docs/api.md.
 servers:
-  - url: https://fastlog-production-9626.up.railway.app
-    description: Railway production API
+  - url: https://your-deployment.example
+    description: Your FastLog deployment. Set this to your backend's public HTTPS URL before importing the Action into ChatGPT.
 security:
   - bearerAuth: []
 paths:
