@@ -1,5 +1,11 @@
 # FastLog
 
+[![CI](https://github.com/jacobwolf-1/FastLog/actions/workflows/ci.yml/badge.svg)](https://github.com/jacobwolf-1/FastLog/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Node 22+](https://img.shields.io/badge/node-22%2B-3c873a.svg)
+
+**Dependency-free TypeScript backend · Supabase/Postgres with Row Level Security · OpenAPI ChatGPT Action · SwiftUI iOS MVP.**
+
 A minimal, AI-native macro-tracking API. FastLog is deliberately **not** a food
 database or a diet coach — it answers one question, *"what numbers do you want
 to log?"*, and exposes a small, safe surface for an AI assistant (or an iOS app)
@@ -35,6 +41,18 @@ Four properties enforce that:
 
 You don't have to take my word for any of it: there's an executable test that
 exercises this exact path (below).
+
+## Demo
+
+<!-- TODO(media): add real captures and uncomment. Files go in docs/media/.
+![A Custom GPT logs a meal; the same entry appears in the iOS Today view stamped source=chatgpt](docs/media/chatgpt-to-app.gif)
+-->
+
+> 📷 **Placeholder (MVP — capture pending).** The intended hero clip is
+> `docs/media/chatgpt-to-app.gif`: a Custom GPT logs a meal, then the same entry
+> appears in the iOS **Today** view stamped `source=chatgpt`. Until then, the
+> runnable [AI write-path test](#see-the-ai-write-path-yourself) demonstrates the
+> same flow headlessly.
 
 ## Quickstart (≈30 seconds, no database, no keys)
 
@@ -89,6 +107,25 @@ npm test
 Both pass with no setup.
 
 ## How it fits together
+
+```mermaid
+flowchart LR
+    GPT["ChatGPT Action<br/>(7-operation subset)"]
+    IOS["SwiftUI iOS MVP"]
+    CLI["Any REST client"]
+
+    GPT -->|Bearer token| APP["app.ts<br/>routing + validation"]
+    IOS -->|Bearer token| APP
+    CLI -->|Bearer token| APP
+
+    APP -->|"server stamps source / provider<br/>(spoofed request values ignored)"| DOM["domain.ts<br/>macros · dashboard · saved meals"]
+
+    DOM --> STORE{"store.ts"}
+    STORE --> MEM[("memory-store<br/>dev + tests")]
+    STORE --> SUP[("supabase-store<br/>Postgres + RLS")]
+
+    DOM -. "AI-origin writes" .-> AUDIT[["ai_audit_log"]]
+```
 
 ```text
 src/
