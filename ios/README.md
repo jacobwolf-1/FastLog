@@ -38,7 +38,7 @@ For the local memory-mode backend, no Supabase setup is needed:
 1. Start the backend from the repo root:
 
    ```sh
-   cd /Users/jacobwolf/FastLog
+   cd FastLog   # the repo root
    FASTLOG_STORE=memory npm run dev   # listens on http://localhost:8787
    ```
 
