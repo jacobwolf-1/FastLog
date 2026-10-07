@@ -20,7 +20,7 @@ Set the OpenAPI `servers` URL to your backend's public HTTPS URL before configur
 
 ## Deployment Prerequisites
 
-See `docs/deployment-auth-plan.md`, `docs/action-deployment-checklist.md`, and `docs/chatgpt-action-smoke-test.md` before configuring a real Action.
+See `docs/archive/deployment-auth-plan.md`, `docs/archive/action-deployment-checklist.md`, and `docs/chatgpt-action-smoke-test.md` before configuring a real Action.
 
 - Deploy the FastLog backend behind HTTPS.
 - Decide the production auth/token exchange for ChatGPT users.

@@ -1,6 +1,6 @@
 # Local AI Action Demo
 
-This is the local v0.2 demo flow for the ChatGPT Action-safe API surface. It uses memory mode and the development bearer token only.
+This is the local demo flow for the ChatGPT Action-safe API surface. It uses memory mode and the development bearer token only.
 
 Do not use the dev bearer token in production.
 
