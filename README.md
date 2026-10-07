@@ -1,63 +1,62 @@
 # FastLog
 
+FastLog gives people who already estimate macros with ChatGPT a fast, trustworthy place to log those numbers. It is not a food database.
+
 [![CI](https://github.com/jacobwolf-1/FastLog/actions/workflows/ci.yml/badge.svg)](https://github.com/jacobwolf-1/FastLog/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node 22+](https://img.shields.io/badge/node-22%2B-3c873a.svg)
 
-**Dependency-free TypeScript backend · Supabase/Postgres with Row Level Security · OpenAPI ChatGPT Action · SwiftUI iOS MVP.**
+## Screenshots
 
-A minimal, AI-native macro-tracking API. FastLog is deliberately **not** a food
-database or a diet coach — it answers one question, *"what numbers do you want
-to log?"*, and exposes a small, safe surface for an AI assistant (or an iOS app)
-to log them.
+| Dashboard | Manual log | Saved meals |
+| --- | --- | --- |
+| ![Today dashboard with calorie and macro progress](docs/images/dashboard.png) | ![Manual food log with calories and macros filled in](docs/images/manual-log.png) | ![Saved meal templates with aliases and Log buttons](docs/images/saved-meals.png) |
 
-The interesting part is the **ChatGPT Custom GPT integration**: a GPT can write
-food logs, update targets, and resolve saved meals through a deliberately narrow,
-tamper-resistant API. The rest of this README shows how that path is kept safe —
-and how to run the whole thing locally in about 30 seconds, with no database and
-no keys.
+## How it works
 
-## Headline: a ChatGPT Action that can't lie about who it is
+With a breakfast template saved under the alias “usual breakfast”:
 
-A ChatGPT Custom GPT talks to FastLog through an OpenAPI **subset**, not the full
-backend. The design goal: *let an AI write to a user's log without letting any
-client forge an AI-origin write or reach beyond what an assistant should touch.*
-Four properties enforce that:
+1. **Ask ChatGPT:** “Log my usual breakfast, 1.5 servings.”
+2. **Resolve the meal:** the Action asks the backend to find the saved template by name or alias.
+3. **Log the numbers:** the backend copies the stored macros, scales them by 1.5, and stamps the food log `source=chatgpt` on the ChatGPT-facing deployment.
+4. **See the result:** opening or refreshing the iPhone's Today dashboard loads the updated totals and food log.
+5. **Trace the write:** the same backend request also records an `ai_audit_log` row with the provider, operation, and user.
 
-- **Action-safe route subset.** [`openapi/chatgpt-action.yaml`](openapi/chatgpt-action.yaml)
-  exposes only seven operations — `logFood`, `getTodayDashboard`, `updateTargets`,
-  `resolveSavedMeal`, `logSavedMeal`, `createSavedMeal`, `listSavedMeals`. No
-  deletes, no broad edits, no weight writes, no date-range reads.
-- **Server-derived provenance.** A client cannot claim "this write came from
-  ChatGPT." The `source`/`provider` fields are *not in the request schema* — the
-  server stamps them itself from deployment context. A normal API write is
-  `source=manual`; a write on the ChatGPT-facing deployment is `source=chatgpt`.
-  Spoofed `source`/`provider` in a request body are ignored.
-- **AI audit log.** Every AI-origin write records an `ai_audit_log` row (provider,
-  operation, user), so AI-created data stays attributable after the fact.
-- **Per-user isolation via RLS.** The Supabase-backed store uses user-scoped
-  bearer tokens plus the anon key, so Postgres Row Level Security — not app code —
-  blocks one user from reading or writing another user's data.
+If no confident match exists, the assistant asks whether to estimate and log a one-off entry. It must not silently invent a saved meal.
 
-You don't have to take my word for any of it: there's an executable test that
-exercises this exact path (below).
+## What I built
 
-## Demo
+- **Postgres schema with row-level security:** user-owned targets, food logs, saved meals and aliases, weight entries, and AI audit records.
+- **REST API with memory and Supabase stores:** local demos and tests use memory; the Supabase store passes user tokens through to Postgres for ownership enforcement.
+- **ChatGPT Action limited to seven operations:** `logFood`, `getTodayDashboard`, `updateTargets`, `resolveSavedMeal`, `logSavedMeal`, `createSavedMeal`, and `listSavedMeals`.
+- **SwiftUI iPhone app with optional HealthKit:** dashboard, manual logging, saved meals, targets, and weight trends; body-mass reading stays on-device.
+- **Integration and AI-path test suites:** dashboard calculations, saved-meal history, serving multipliers, spoofed provenance fields, and AI audit records.
 
-<!-- TODO(media): add real captures and uncomment. Files go in docs/media/.
-![A Custom GPT logs a meal; the same entry appears in the iOS Today view stamped source=chatgpt](docs/media/chatgpt-to-app.gif)
--->
+## Architecture
 
-> 📷 **Placeholder (MVP — capture pending).** The intended hero clip is
-> `docs/media/chatgpt-to-app.gif`: a Custom GPT logs a meal, then the same entry
-> appears in the iOS **Today** view stamped `source=chatgpt`. Until then, the
-> runnable [AI write-path test](#see-the-ai-write-path-yourself) demonstrates the
-> same flow headlessly.
+```mermaid
+flowchart LR
+    GPT["ChatGPT Custom GPT"] -->|"7 Action operations"| API["FastLog API"]
+    subgraph DEVICE["On the iPhone"]
+        IOS["SwiftUI iOS app"]
+        HK["HealthKit"] -->|"Optional body-mass read"| IOS
+    end
+    IOS -->|"REST API"| API
+    API -->|"User token + anon key"| DB[("Supabase Postgres (RLS)")]
+```
 
-## Quickstart (≈30 seconds, no database, no keys)
+HealthKit access happens locally. The user can prefill a weight entry from Apple Health and save it to FastLog; the app does not write back to Apple Health.
 
-**Requires Node 22+.** The API layer is dependency-free — there is nothing to
-`npm install`.
+## Design decisions
+
+- **No food database.** FastLog focuses on logging and daily totals; users supply nutrition values themselves or estimate them with an assistant.
+- **A narrow AI operation set.** Seven operations cover the core logging workflow and reduce the actions an assistant can take; deletes, broad edits, weight operations, and date-range reads stay outside the Action.
+- **Server-derived provenance and audit records.** The backend ignores client-supplied `source` and `provider`, making AI writes attributable; this requires a trusted deployment context for the ChatGPT path.
+- **Backend-only saved-meal resolution.** The assistant logs a resolved template's stored macros instead of inventing a saved meal; uncertain matches require a follow-up rather than a guessed template.
+
+## Quickstart
+
+Requires **Node 22+**. Run locally with no database or credentials:
 
 ```sh
 git clone https://github.com/jacobwolf-1/FastLog.git
@@ -79,95 +78,54 @@ curl -s -X POST http://localhost:8787/v1/food-logs \
   -d '{"calories":500,"protein_g":40,"carbs_g":45,"fat_g":15,"label":"lunch"}'
 ```
 
-In memory mode only, auth is a dev token of the form `Bearer dev:<user-id>[:email]`
-— no real JWT needed.
+In memory mode only, auth uses `Bearer dev:<user-id>[:email]`. For the iPhone app, follow the [iOS developer-mode setup](ios/README.md#local-development-developer-mode).
 
 ## See the AI write path yourself
 
-The ChatGPT Action flow is backed by an executable smoke test that needs **no
-hosting, no ChatGPT account, and no credentials**. It boots the API in memory
-mode and drives the exact Action-safe routes a GPT would call:
+The executable smoke test runs the Action routes in memory, with no hosting, ChatGPT account, or credentials:
 
 ```sh
 npm run test:ai-action
 ```
 
-It verifies saved-meal resolution, 1.5× saved-meal logging, one-off logging,
-target updates, the **server-derived `source`/`provider`** behavior (including
-ignoring spoofed values), and that AI audit rows get written.
+It checks saved-meal resolution, 1.5× logging, one-off logging, target updates, server-derived `source`/`provider` (including ignored spoofed values), and AI audit rows.
 
-The full integration suite covers the rest — dashboard math, saved-meal alias
-cascades, history preservation on saved-meal delete, and user-isolation
-assumptions:
+Run the integration suite for dashboard math, saved-meal edits and alias cascades, historical-log preservation, and user-isolation assumptions:
 
 ```sh
 npm test
 ```
 
-Both pass with no setup.
+For an interactive walkthrough, follow the [local AI demo](docs/local-ai-demo.md).
 
-## How it fits together
+## Status / not yet done
 
-```mermaid
-flowchart LR
-    GPT["ChatGPT Action<br/>(7-operation subset)"]
-    IOS["SwiftUI iOS MVP"]
-    CLI["Any REST client"]
+- Production OAuth/account linking for the GPT is designed but not implemented. The [private Action smoke test](docs/chatgpt-action-smoke-test.md) uses a temporary user token.
+- A real Supabase `db reset` has not been run; live migration and RLS verification remain outstanding.
+- The iOS app uses a minimal GoTrue client for Supabase Auth, rather than the supabase-swift SDK.
 
-    GPT -->|Bearer token| APP["app.ts<br/>routing + validation"]
-    IOS -->|Bearer token| APP
-    CLI -->|Bearer token| APP
+## Deploying
 
-    APP -->|"server stamps source / provider<br/>(spoofed request values ignored)"| DOM["domain.ts<br/>macros · dashboard · saved meals"]
-
-    DOM --> STORE{"store.ts"}
-    STORE --> MEM[("memory-store<br/>dev + tests")]
-    STORE --> SUP[("supabase-store<br/>Postgres + RLS")]
-
-    DOM -. "AI-origin writes" .-> AUDIT[["ai_audit_log"]]
-```
-
-```text
-src/
-  server.ts          # tiny dependency-free HTTP layer
-  app.ts             # routing + request handling
-  domain.ts          # core domain logic (macros, dashboard totals, saved meals)
-  store.ts           # store interface
-  memory-store.ts    # in-memory store (dev + tests)
-  supabase-store.ts  # Supabase/Postgres store (RLS-enforced)
-openapi/
-  chatgpt-action.yaml  # the restricted ChatGPT Action subset
-supabase/
-  migrations/          # schema + Row Level Security policies
-docs/                  # API reference, AI behavior rules, setup guides
-ios/                   # SwiftUI MVP client (drives the same API)
-```
-
-- **Full API vs. Action subset** — the backend also serves food-log edits,
-  deletes, weight entries, and weight trends. Those are intentionally *not* in
-  the ChatGPT Action surface. See [`docs/api.md`](docs/api.md).
-- **iOS app** — a SwiftUI MVP that drives the same API and can read body mass
-  from HealthKit locally (optional; the app works without it). See
-  [`ios/README.md`](ios/README.md).
-- **AI behavior rules** — [`docs/ai-behavior.md`](docs/ai-behavior.md); ChatGPT
-  wiring in [`docs/chatgpt-action-setup.md`](docs/chatgpt-action-setup.md).
-
-## Deploy anywhere (optional)
-
-Nothing above needs a server. To run against real data instead of memory mode,
-point it at a Supabase project and start it on any Node host:
+To use a Supabase project, run the API on a Node host behind HTTPS:
 
 ```sh
 FASTLOG_STORE=supabase \
-SUPABASE_URL=<your project url> \
-SUPABASE_ANON_KEY=<your anon/publishable key> \
+SUPABASE_URL='https://your-project.supabase.co' \
+SUPABASE_ANON_KEY='your-anon-or-publishable-key' \
 npm start
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is server-side only and is never needed by the API
-layer, iOS, or the ChatGPT Action — the design relies on user bearer tokens plus
-the anon key so RLS enforces ownership. For a ChatGPT-facing deployment, also set
-`FASTLOG_INTEGRATION_PROVIDER=chatgpt` so writes are stamped server-side.
+The API uses user bearer tokens and the anon key so RLS enforces ownership; it does not require a service-role key. Set `FASTLOG_INTEGRATION_PROVIDER=chatgpt` on the ChatGPT-facing deployment to derive provenance server-side. Keep default/manual traffic on a deployment without that setting.
+
+See [ChatGPT Action setup](docs/chatgpt-action-setup.md) for configuration and authentication requirements.
+
+## Documentation
+
+- [Product summary](docs/PRODUCT_PLAN.md)
+- [Full API reference](docs/api.md)
+- [AI behavior](docs/ai-behavior.md) and [saved-meal resolution](docs/saved-meal-resolution.md)
+- [iOS setup](ios/README.md)
+- [Test plan](docs/test-plan.md)
 
 ## License
 

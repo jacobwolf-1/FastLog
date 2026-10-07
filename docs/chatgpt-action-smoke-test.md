@@ -8,7 +8,7 @@ https://your-deployment.example
 
 This uses a temporary Supabase user JWT as an API-key bearer token in a private GPT. It is not production auth. Do not use this for real user-facing distribution. Production still needs OAuth or another per-user token exchange before broader use.
 
-Do not paste JWTs into logs, docs, GitHub, screenshots, Codex, or support threads.
+Do not paste JWTs into logs, docs, GitHub, screenshots, or support threads.
 
 ## Before You Start
 
@@ -87,7 +87,7 @@ Confirm the dashboard updates.
 
 `401 Unable to authenticate Supabase user.`
 
-Refresh the JWT. Confirm your deployment's `SUPABASE_URL` and `SUPABASE_ANON_KEY` match the same Supabase project used to issue the JWT. Do not paste the JWT or keys into logs, docs, GitHub, or Codex.
+Refresh the JWT. Confirm your deployment's `SUPABASE_URL` and `SUPABASE_ANON_KEY` match the same Supabase project used to issue the JWT. Do not paste the JWT or keys into logs, docs, or GitHub.
 
 `400` schema validation error in GPT Builder.
 
